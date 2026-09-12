@@ -1,26 +1,257 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-dark: #0e0600;
+  --bg-card: #1c0d00;
+  --bg-card2: #231000;
+  --pink: #e8197d;
+  --pink-light: #ff4db8;
+  --gold: #c9a84c;
+  --text-light: #f5e6d0;
+  --text-muted: rgba(245,230,208,0.45);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(232,25,125,0.4); border-radius: 2px; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-dark);
+  color: var(--text-light);
+  font-family: 'Arial', sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.page {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #120700 0%, #1e0c00 50%, #0e0600 100%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── Buttons ── */
+.btn-pink {
+  background: linear-gradient(135deg, #e8197d 0%, #b5105e 100%);
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  padding: 12px 24px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  width: 100%;
+  letter-spacing: 0.5px;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-pink:hover { opacity: 0.88; }
+.btn-pink:active { transform: scale(0.98); }
+.btn-pink:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--pink);
+  border: 1.5px solid var(--pink);
+  border-radius: 30px;
+  padding: 11px 24px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.2s;
+}
+.btn-outline:hover { background: var(--pink); color: #fff; }
+
+/* ── Inputs ── */
+.inp {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text-light);
+  width: 100%;
+  outline: none;
+  font-size: 13px;
+}
+.inp:focus { border-color: var(--pink); background: rgba(255,255,255,0.1); }
+.inp::placeholder { color: var(--text-muted); }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid rgba(201,168,76,0.12);
+}
+.card2 {
+  background: var(--bg-card2);
+  border-radius: 12px;
+  border: 1px solid rgba(201,168,76,0.1);
+}
+
+/* ── Text helpers ── */
+.gold { color: var(--gold); }
+.pink { color: var(--pink); }
+.muted { color: var(--text-muted); }
+
+/* ── Top bar / back header ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 8px;
+}
+.back-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(201,168,76,0.2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+/* ── Service card ── */
+.svc-card {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(201,168,76,0.12);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.svc-card:hover { border-color: rgba(232,25,125,0.5); background: rgba(232,25,125,0.04); }
+.svc-card.sel { border-color: var(--pink); background: rgba(232,25,125,0.07); }
+
+/* ── Stylist card ── */
+.stylist-card {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(201,168,76,0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.stylist-card:hover, .stylist-card.sel { border-color: var(--pink); }
+
+/* ── Calendar ── */
+.cal-day {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+  margin: auto;
+}
+.cal-day:hover { background: rgba(232,25,125,0.25); }
+.cal-day.sel { background: var(--pink); color: #fff; font-weight: 700; }
+.cal-day.today { border: 1.5px solid var(--gold); }
+.cal-day.empty { cursor: default; }
+
+/* ── Time slot ── */
+.time-slot {
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 8px;
+  padding: 7px 4px;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+  transition: all 0.15s;
+  color: var(--text-light);
+}
+.time-slot:hover, .time-slot.sel { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+/* ── Bottom nav ── */
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0 14px;
+  background: var(--bg-card);
+  border-top: 1px solid rgba(201,168,76,0.15);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+.nav-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3px; cursor: pointer; font-size: 9px;
+  color: var(--text-muted); transition: color 0.2s;
+  padding: 0 8px;
+}
+.nav-item.on, .nav-item:hover { color: var(--pink); }
+
+/* ── Status badges ── */
+.badge {
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; text-transform: capitalize;
+}
+.badge-confirmed { background: rgba(76,175,80,0.18); color: #4caf50; }
+.badge-pending   { background: rgba(255,193,7,0.18);  color: #ffc107; }
+.badge-cancelled { background: rgba(244,67,54,0.18);  color: #f44336; }
+
+/* ── Admin ── */
+.admin-wrap { display: flex; min-height: 100vh; background: #0a0a0a; }
+.admin-side {
+  width: 190px; background: #111; min-height: 100vh;
+  display: flex; flex-direction: column; flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.admin-side-item {
+  padding: 11px 18px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+  color: rgba(255,255,255,0.6); transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.admin-side-item:hover { background: rgba(232,25,125,0.1); color: #fff; }
+.admin-side-item.on { background: rgba(232,25,125,0.15); color: var(--pink); border-left-color: var(--pink); }
+.admin-main { flex: 1; overflow-y: auto; background: #0f0f0f; }
+.admin-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: #111; position: sticky; top: 0; z-index: 5;
+}
+.stat-card {
+  background: #1a1a1a; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 16px;
+}
+
+/* ── Hero image placeholder ── */
+.hero-img {
+  width: 100%; height: 200px;
+  background: linear-gradient(180deg, #1a0800 0%, #3d1500 40%, #5c2000 70%, #3d1500 100%);
+  position: relative; overflow: hidden;
+  display: flex; align-items: flex-end;
+}
+.hero-img::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 60% 30%, rgba(180,80,20,0.35) 0%, transparent 70%),
+              radial-gradient(ellipse at 40% 80%, rgba(232,25,125,0.15) 0%, transparent 60%);
+}
+.hero-silhouette {
+  position: absolute; right: 20px; bottom: 0;
+  font-size: 120px; line-height: 1; opacity: 0.55;
+  filter: sepia(1) saturate(0.3);
+}
+
+/* ── Logo circle ── */
+.logo-circle {
+  width: 56px; height: 56px; border-radius: 50%;
+  border: 2px solid var(--gold);
+  background: rgba(201,168,76,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex-shrink: 0;
 }
