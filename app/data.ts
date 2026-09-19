@@ -1,3 +1,35 @@
+export type HairType = { name: string; time: string };
+
+export const BOYS_HAIRCUTS: HairType[] = [
+  { name: "Classic Cut",   time: "30 min" },
+  { name: "Crew Cut",      time: "30 min" },
+  { name: "Buzz Cut",      time: "20–30 min" },
+  { name: "Fade Cut",      time: "30–45 min" },
+  { name: "Low Fade",      time: "30–45 min" },
+  { name: "Mid Fade",      time: "30–45 min" },
+  { name: "High Fade",     time: "30–45 min" },
+  { name: "Taper Cut",     time: "30–45 min" },
+  { name: "Undercut",      time: "30–45 min" },
+  { name: "Textured Cut",  time: "30–45 min" },
+  { name: "Two-Block Cut", time: "45 min" },
+  { name: "Side Part",     time: "30–45 min" },
+];
+
+export const GIRLS_HAIRCUTS: HairType[] = [
+  { name: "Classic Bob",           time: "45 min" },
+  { name: "Layered Cut",           time: "45–60 min" },
+  { name: "Long Layer Cut",        time: "45–60 min" },
+  { name: "Short Bob",             time: "45 min" },
+  { name: "Lob (Long Bob)",        time: "45–60 min" },
+  { name: "Wolf Cut",              time: "60 min" },
+  { name: "Butterfly Cut",         time: "60 min" },
+  { name: "Shag Cut",              time: "45–60 min" },
+  { name: "U-Cut",                 time: "45 min" },
+  { name: "V-Cut",                 time: "45 min" },
+  { name: "Pixie Cut",             time: "45 min" },
+  { name: "Curtain Bangs + Trim",  time: "30–45 min" },
+];
+
 export const SERVICES = [
   { id: 1, name: "Hair Cut", desc: "Professional Hair Cut and style", duration: "45 min", price: 350, img: "✂️" },
   { id: 2, name: "Hair Spa", desc: "Deep conditioning treatment", duration: "60 min", price: 480, img: "💆" },
@@ -33,3 +65,48 @@ export const ADMIN_BOOKINGS = [
   { id: 4, customer: "Lea Gomez", service: "Hair Color", stylist: "Christine Rory", date: "Sep 11", time: "2:00 PM", status: "pending" },
   { id: 5, customer: "Rose Tan", service: "Facial", stylist: "Monica Vargas", date: "Sep 12", time: "3:00 PM", status: "cancelled" },
 ];
+
+// ── Booking store (localStorage) ──────────────────────────────────────────
+export type Booking = {
+  id: string;
+  customer: string;
+  phone: string;
+  serviceIds: number[];
+  stylistId: number | null;
+  date: string;
+  time: string;
+  notes: string;
+  status: "pending" | "confirmed" | "cancelled";
+  createdAt: string;
+};
+
+const STORE_KEY = "salon_bookings";
+
+export function getBookings(): Booking[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+  } catch { return []; }
+}
+
+export function saveBooking(b: Omit<Booking, "id" | "status" | "createdAt">): Booking {
+  const bookings = getBookings();
+  const newBooking: Booking = {
+    ...b,
+    id: Date.now().toString(),
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  bookings.unshift(newBooking);
+  localStorage.setItem(STORE_KEY, JSON.stringify(bookings));
+  return newBooking;
+}
+
+export function updateBookingStatus(id: string, status: Booking["status"]): void {
+  const bookings = getBookings();
+  const idx = bookings.findIndex(b => b.id === id);
+  if (idx !== -1) {
+    bookings[idx].status = status;
+    localStorage.setItem(STORE_KEY, JSON.stringify(bookings));
+  }
+}

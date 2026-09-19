@@ -22,9 +22,17 @@ export default function App() {
   const [selectedTime, setSelectedTime] = useState("");
   const [selectedStylist, setSelectedStylist] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [loggedInName, setLoggedInName]     = useState("");
+  const [loggedInPhone, setLoggedInPhone]   = useState("");
+  const [loggedInUsername, setLoggedInUsername] = useState("");
 
-  const handleLogin = (r: "user" | "admin") => {
+  const handleLogin = (r: "user" | "admin", name: string, phone: string, username: string) => {
     setRole(r);
+    setLoggedInName(name);
+    setLoggedInPhone(phone);
+    setLoggedInUsername(username);
     setScreen(r === "admin" ? "admin" : "home");
   };
 
@@ -39,8 +47,10 @@ export default function App() {
   const toggleService = (id: number) =>
     setSelectedServices(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
 
-  const handleConfirm = ({ name }: { name: string; phone: string; notes: string }) => {
+  const handleConfirm = ({ name, phone, notes }: { name: string; phone: string; notes: string }) => {
     setCustomerName(name);
+    setCustomerPhone(phone);
+    setCustomerNotes(notes);
     setScreen("confirm");
   };
 
@@ -60,6 +70,7 @@ export default function App() {
           onBook={() => setScreen("select-service")}
           onMyBookings={() => setScreen("my-bookings")}
           onLogout={handleLogout}
+          userName={loggedInUsername || loggedInName}
         />
       )}
       {screen === "select-service" && (
@@ -94,6 +105,8 @@ export default function App() {
           stylistId={selectedStylist}
           date={selectedDate}
           time={selectedTime}
+          defaultName={loggedInName}
+          defaultPhone={loggedInPhone}
           onConfirm={handleConfirm}
           onBack={() => setScreen("choose-stylist")}
         />
@@ -105,6 +118,8 @@ export default function App() {
           date={selectedDate}
           time={selectedTime}
           customerName={customerName}
+          customerPhone={customerPhone}
+          customerNotes={customerNotes}
           onDone={() => setScreen("my-bookings")}
           onNewBooking={resetBooking}
         />

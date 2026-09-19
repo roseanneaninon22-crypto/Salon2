@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { ADMIN_BOOKINGS, SERVICES, STYLISTS } from "../data";
+import { useState, useEffect } from "react";
+import { ADMIN_BOOKINGS, SERVICES, STYLISTS, getBookings, updateBookingStatus, Booking } from "../data";
 
 type Props = { onLogout: () => void };
 
@@ -24,14 +24,30 @@ const cells = Array(SEP_FIRST).fill(null).concat(Array.from({ length: SEP_DAYS }
 export default function AdminDashboard({ onLogout }: Props) {
   const [active, setActive] = useState("Dashboard");
   const [sideOpen, setSideOpen] = useState(true);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+
+  useEffect(() => { setBookings(getBookings()); }, [active]);
+
+  const handleStatus = (id: string, status: Booking["status"]) => {
+    updateBookingStatus(id, status);
+    setBookings(getBookings());
+  };
+
+  const getServiceNames = (ids: number[]) =>
+    SERVICES.filter(s => ids.includes(s.id)).map(s => s.name).join(", ");
+  const getStylistName = (id: number | null) =>
+    id ? (STYLISTS.find(s => s.id === id)?.name ?? "Any available") : "Any available";
+
+  const pendingCount   = bookings.filter(b => b.status === "pending").length;
+  const confirmedCount = bookings.filter(b => b.status === "confirmed").length;
 
   const go = (label: string) => { if (label === "Logout") { onLogout(); return; } setActive(label); };
 
   const stats = [
-    { label: "Total Appointment", value: "128", color: "#e8197d", icon: "📅" },
-    { label: "Pending Appointments", value: "14", color: "#ffc107", icon: "⏳" },
-    { label: "Total Customer", value: "87", color: "#2196f3", icon: "👥" },
-    { label: "Total Revenue", value: "₱42,500", color: "#4caf50", icon: "💰" },
+    { label: "Total Appointments", value: String(bookings.length || ADMIN_BOOKINGS.length), color: "#e8197d", icon: "📅" },
+    { label: "Pending Appointments", value: String(pendingCount || 14), color: "#ffc107", icon: "⏳" },
+    { label: "Confirmed", value: String(confirmedCount || 0), color: "#4caf50", icon: "✅" },
+    { label: "Total Revenue", value: "₱42,500", color: "#2196f3", icon: "💰" },
   ];
 
   return (
@@ -117,11 +133,11 @@ export default function AdminDashboard({ onLogout }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {ADMIN_BOOKINGS.map(b => (
+                      {(bookings.length > 0 ? bookings : ADMIN_BOOKINGS).slice(0, 5).map((b: any) => (
                         <tr key={b.id} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                           <td style={{ padding: "8px 10px 8px 0" }}>{b.customer}</td>
-                          <td style={{ padding: "8px 10px 8px 0" }}>{b.service}</td>
-                          <td style={{ padding: "8px 10px 8px 0" }}>{b.stylist.split(" ")[0]}</td>
+                          <td style={{ padding: "8px 10px 8px 0" }}>{b.serviceIds ? getServiceNames(b.serviceIds) : b.service}</td>
+                          <td style={{ padding: "8px 10px 8px 0" }}>{b.stylistId != null ? getStylistName(b.stylistId) : b.stylist?.split(" ")[0]}</td>
                           <td style={{ padding: "8px 10px 8px 0" }}>{b.date}</td>
                           <td style={{ padding: "8px 10px 8px 0" }}>{b.time}</td>
                           <td style={{ padding: "8px 0" }}>
@@ -165,34 +181,79 @@ export default function AdminDashboard({ onLogout }: Props) {
             <div className="stat-card" style={{ padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <p style={{ fontWeight: 700, color: "var(--gold)" }}>All Appointments</p>
-                <button className="btn-pink" style={{ width: "auto", padding: "6px 14px", fontSize: 12 }}>+ New</button>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{bookings.length} total</span>
               </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ color: "rgba(255,255,255,0.35)" }}>
-                    {["#","Customer","Service","Stylist","Date","Time","Status","Action"].map(h => (
-                      <th key={h} style={{ textAlign: "left", paddingBottom: 10, paddingRight: 12, fontWeight: 600 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ADMIN_BOOKINGS.map(b => (
-                    <tr key={b.id} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.id}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.customer}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.service}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.stylist.split(" ")[0]}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.date}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}>{b.time}</td>
-                      <td style={{ padding: "9px 12px 9px 0" }}><span className={`badge badge-${b.status}`}>{b.status}</span></td>
-                      <td style={{ padding: "9px 0" }}>
-                        <button style={{ background: "none", border: "none", cursor: "pointer", marginRight: 6, fontSize: 14 }}>✏️</button>
-                        <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-                      </td>
-                    </tr>
+              {bookings.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0" }}>
+                  <p style={{ fontSize: 32, marginBottom: 10 }}>📋</p>
+                  <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No bookings yet</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {bookings.map(b => (
+                    <div key={b.id} style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      borderRadius: 12, padding: "12px 14px",
+                    }}>
+                      {/* top row */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: 13 }}>{b.customer}</p>
+                          <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{getServiceNames(b.serviceIds)}</p>
+                          <p style={{ fontSize: 11, color: "var(--text-muted)" }}>{getStylistName(b.stylistId)}</p>
+                        </div>
+                        <span className={`badge badge-${b.status}`}>{b.status}</span>
+                      </div>
+                      {/* info row */}
+                      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>
+                        <span>📅 {b.date}</span>
+                        <span>🕐 {b.time}</span>
+                        {b.phone && <span>📱 {b.phone}</span>}
+                      </div>
+                      {/* action buttons — only for pending */}
+                      {b.status === "pending" && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => handleStatus(b.id, "confirmed")}
+                            style={{
+                              flex: 1, padding: "7px 0", borderRadius: 8,
+                              background: "linear-gradient(135deg,#4caf50,#388e3c)",
+                              border: "none", color: "#fff",
+                              fontSize: 12, fontWeight: 700, cursor: "pointer",
+                            }}>
+                            ✓ Approve
+                          </button>
+                          <button
+                            onClick={() => handleStatus(b.id, "cancelled")}
+                            style={{
+                              flex: 1, padding: "7px 0", borderRadius: 8,
+                              background: "rgba(244,67,54,0.15)",
+                              border: "1px solid rgba(244,67,54,0.4)",
+                              color: "#f44336",
+                              fontSize: 12, fontWeight: 700, cursor: "pointer",
+                            }}>
+                            ✕ Cancel
+                          </button>
+                        </div>
+                      )}
+                      {b.status === "confirmed" && (
+                        <button
+                          onClick={() => handleStatus(b.id, "cancelled")}
+                          style={{
+                            width: "100%", padding: "7px 0", borderRadius: 8,
+                            background: "rgba(244,67,54,0.1)",
+                            border: "1px solid rgba(244,67,54,0.3)",
+                            color: "#f44336",
+                            fontSize: 12, fontWeight: 700, cursor: "pointer",
+                          }}>
+                          ✕ Cancel Appointment
+                        </button>
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
           )}
 
