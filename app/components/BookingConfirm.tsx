@@ -1,25 +1,35 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { SERVICES, STYLISTS, saveBooking } from "../data";
+import { SERVICES, STYLISTS, saveBooking, HairType } from "../data";
 
 type Props = {
   serviceIds: number[]; stylistId: number | null;
   date: string; time: string;
+  chosen: Record<number, HairType>;
   customerName: string; customerPhone: string; customerNotes: string;
   onDone: () => void; onNewBooking: () => void;
 };
 
-export default function BookingConfirm({ serviceIds, stylistId, date, time, customerName, customerPhone, customerNotes, onDone, onNewBooking }: Props) {
+export default function BookingConfirm({ serviceIds, stylistId, date, time, chosen, customerName, customerPhone, customerNotes, onDone, onNewBooking }: Props) {
   const saved = useRef(false);
 
   const services = SERVICES.filter(s => serviceIds.includes(s.id));
   const stylist  = stylistId ? STYLISTS.find(s => s.id === stylistId) : null;
-  const total    = services.reduce((sum, s) => sum + s.price, 0);
+  const priceOf  = (s: { id: number; price: number; priced?: boolean }) =>
+    s.priced ? (chosen[s.id]?.price ?? 0) : s.price;
+  const total    = services.reduce((sum, s) => sum + priceOf(s), 0);
+
+  /* The chosen types are recorded in the notes so totals stay correct later */
+  const typeNotes = services
+    .filter(s => chosen[s.id])
+    .map(s => `${s.name}: ${chosen[s.id].name}`)
+    .join("; ");
+  const notesWithTypes = [customerNotes, typeNotes].filter(Boolean).join(" | ");
 
   useEffect(() => {
     if (saved.current) return;
     saved.current = true;
-    saveBooking({ customer: customerName, phone: customerPhone, serviceIds, stylistId, date, time, notes: customerNotes });
+    saveBooking({ customer: customerName, phone: customerPhone, serviceIds, stylistId, date, time, notes: notesWithTypes });
   }, []);
 
   return (
@@ -60,7 +70,7 @@ export default function BookingConfirm({ serviceIds, stylistId, date, time, cust
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
               {[
-                ["Services",  services.map(s => s.name).join(", ")],
+                ["Services",  services.map(s => chosen[s.id] ? `${s.name} (${chosen[s.id].name})` : s.name).join(", ")],
                 ["Stylist",   stylist ? stylist.name : "Any available"],
                 ["Date",      date],
                 ["Time",      time],

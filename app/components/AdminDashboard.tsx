@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ADMIN_BOOKINGS, SERVICES, STYLISTS, getBookings, updateBookingStatus, Booking } from "../data";
+import { ADMIN_BOOKINGS, SERVICES, STYLISTS, servicePrice, getBookings, updateBookingStatus, Booking } from "../data";
 
 type Props = { onLogout: () => void };
 
@@ -270,9 +270,13 @@ export default function AdminDashboard({ onLogout }: Props) {
                     <span style={{ fontSize: 24 }}>{s.img}</span>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</p>
-                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{s.duration}</p>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                        {s.priced ? `${s.types?.length ?? 0} types` : s.duration}
+                      </p>
                     </div>
-                    <p style={{ color: "var(--pink)", fontWeight: 700, fontSize: 13 }}>₱{s.price}</p>
+                    <p style={{ color: "var(--pink)", fontWeight: 700, fontSize: 13 }}>
+                      {s.priced ? `From ₱${servicePrice(s.id)}` : `₱${s.price}`}
+                    </p>
                   </div>
                 ))}
               </div>

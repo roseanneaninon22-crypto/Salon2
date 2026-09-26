@@ -1,26 +1,50 @@
 "use client";
 import { useState, useEffect } from "react";
-import { SERVICES, STYLISTS } from "../data";
+import { SERVICES, STYLISTS, HairType } from "../data";
+import { USER_KEY } from "./AuthScreen";
 
 type Props = {
   serviceIds: number[]; stylistId: number | null;
   date: string; time: string;
+  chosen: Record<number, HairType>;
   defaultName?: string; defaultPhone?: string;
   onConfirm: (info: { name: string; phone: string; notes: string }) => void;
   onBack: () => void;
 };
 
-export default function ReservationForm({ serviceIds, stylistId, date, time, defaultName = "", defaultPhone = "", onConfirm, onBack }: Props) {
+/* Registered details, used as a fallback when the parent has no session
+   state yet (for example right after a page refresh). */
+function storedProfile(): { name: string; phone: string } {
+  if (typeof window === "undefined") return { name: "", phone: "" };
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return { name: "", phone: "" };
+    const u = JSON.parse(raw) as { name?: string; phone?: string };
+    return { name: u.name ?? "", phone: u.phone ?? "" };
+  } catch {
+    return { name: "", phone: "" };
+  }
+}
+
+export default function ReservationForm({ serviceIds, stylistId, date, time, chosen, defaultName = "", defaultPhone = "", onConfirm, onBack }: Props) {
   const [name, setName]   = useState(() => defaultName);
   const [phone, setPhone] = useState(() => defaultPhone);
   const [notes, setNotes] = useState("");
 
-  useEffect(() => { setName(defaultName); }, [defaultName]);
-  useEffect(() => { setPhone(defaultPhone); }, [defaultPhone]);
+  /* Auto-fill the customer information from the registered profile. Values
+     passed down by the parent win; otherwise fall back to localStorage. */
+  useEffect(() => {
+    const stored = storedProfile();
+    setName(prev => defaultName || prev || stored.name);
+    setPhone(prev => defaultPhone || prev || stored.phone);
+  }, [defaultName, defaultPhone]);
 
   const services = SERVICES.filter(s => serviceIds.includes(s.id));
   const stylist  = stylistId ? STYLISTS.find(s => s.id === stylistId) : null;
-  const total    = services.reduce((sum, s) => sum + s.price, 0);
+  /* Price uses the chosen type where the service is type-based */
+  const priceOf  = (s: { id: number; price: number; priced?: boolean }) =>
+    s.priced ? (chosen[s.id]?.price ?? 0) : s.price;
+  const total    = services.reduce((sum, s) => sum + priceOf(s), 0);
 
   return (
     <div className="page">
@@ -107,10 +131,12 @@ export default function ReservationForm({ serviceIds, stylistId, date, time, def
                       <span style={{ fontSize: 22 }}>{s.img}</span>
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</p>
-                        <p style={{ fontSize: 11, color: "var(--text-muted)" }}>⏱ {s.duration}</p>
+                        <p style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          {chosen[s.id] ? `${chosen[s.id].name} • ${chosen[s.id].time}` : `⏱ ${s.duration}`}
+                        </p>
                       </div>
                     </div>
-                    <span style={{ color: "var(--pink)", fontWeight: 700 }}>₱{s.price}</span>
+                    <span style={{ color: "var(--pink)", fontWeight: 700 }}>₱{priceOf(s)}</span>
                   </div>
                 ))}
               </div>

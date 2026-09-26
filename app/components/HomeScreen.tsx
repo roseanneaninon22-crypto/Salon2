@@ -1,16 +1,7 @@
 "use client";
-import { SERVICES } from "../data";
+import { SERVICES, CATEGORIES, servicePrice } from "../data";
 
-const CATS = [
-  { icon: "✂️", label: "Hair Cut" },
-  { icon: "💆", label: "Hair Spa" },
-  { icon: "💅", label: "Manicure" },
-  { icon: "🎨", label: "Hair Color" },
-  { icon: "🧖", label: "Facial" },
-  { icon: "💄", label: "Makeup" },
-];
-
-type Props = { onBook: () => void; onMyBookings: () => void; onLogout: () => void; userName: string };
+type Props = { onBook: (category?: string) => void; onMyBookings: () => void; onLogout: () => void; userName: string };
 
 export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }: Props) {
   return (
@@ -28,7 +19,7 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
 
         <div className="site-nav-links">
           <button className="site-nav-link active">Home</button>
-          <button className="site-nav-link" onClick={onBook}>Services</button>
+          <button className="site-nav-link" onClick={() => onBook()}>Services</button>
           <button className="site-nav-link" onClick={onMyBookings}>My Bookings</button>
           <button className="site-nav-link">About</button>
           <button className="site-nav-link">Contact</button>
@@ -66,7 +57,7 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
             Treat yourself to a premium salon experience. Choose from our wide range of services and expert stylists.
           </p>
           <div style={{ display: "flex", gap: 16 }}>
-            <button className="btn-pink" onClick={onBook} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
+            <button className="btn-pink" onClick={() => onBook()} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
               📅 Book Now
             </button>
             <button className="btn-outline" onClick={onMyBookings} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
@@ -86,9 +77,9 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
               <p style={{ fontSize: 12, color: "var(--gold)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 10 }}>What We Offer</p>
               <h2 style={{ fontSize: 32, fontWeight: 800 }}>Our Services</h2>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 16 }}>
-              {CATS.map(c => (
-                <div key={c.label} className="card card-hover" onClick={onBook}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
+              {CATEGORIES.map(c => (
+                <div key={c.label} className="card card-hover" onClick={() => onBook(c.label)}
                   style={{ padding: "28px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer", textAlign: "center" }}>
                   <span style={{ fontSize: 36 }}>{c.icon}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-light)" }}>{c.label}</span>
@@ -106,12 +97,12 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
                 <p style={{ fontSize: 12, color: "var(--gold)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 8 }}>Top Picks</p>
                 <h2 style={{ fontSize: 28, fontWeight: 800 }}>Popular Services</h2>
               </div>
-              <button className="btn-outline" onClick={onBook} style={{ padding: "10px 24px" }}>View All Services</button>
+              <button className="btn-outline" onClick={() => onBook()} style={{ padding: "10px 24px" }}>View All Services</button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
               {SERVICES.slice(0, 3).map(s => (
-                <div key={s.id} className="card card-hover" onClick={onBook}
+                <div key={s.id} className="card card-hover" onClick={() => onBook()}
                   style={{ padding: 24, cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
                     <div style={{
@@ -127,9 +118,11 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
                   <div className="divider" style={{ margin: "12px 0" }} />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>⏱ {s.duration}</span>
-                    <span style={{ color: "var(--pink)", fontWeight: 800, fontSize: 18 }}>₱{s.price}</span>
+                    <span style={{ color: "var(--pink)", fontWeight: 800, fontSize: 18 }}>
+                      {s.priced ? `From ₱${servicePrice(s.id)}` : `₱${s.price}`}
+                    </span>
                   </div>
-                  <button className="btn-pink wide" onClick={onBook} style={{ marginTop: 16, borderRadius: 10 }}>
+                  <button className="btn-pink wide" onClick={() => onBook()} style={{ marginTop: 16, borderRadius: 10 }}>
                     Book This Service
                   </button>
                 </div>
@@ -152,7 +145,7 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
           <p style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 28 }}>
             Book in minutes and let our experts take care of the rest.
           </p>
-          <button className="btn-pink" onClick={onBook} style={{ padding: "16px 48px", fontSize: 16, borderRadius: 12 }}>
+          <button className="btn-pink" onClick={() => onBook()} style={{ padding: "16px 48px", fontSize: 16, borderRadius: 12 }}>
             Book an Appointment
           </button>
         </section>

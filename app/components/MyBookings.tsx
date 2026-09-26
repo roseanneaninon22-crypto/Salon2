@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { SERVICES, STYLISTS, getBookings, Booking } from "../data";
+import { SERVICES, STYLISTS, getBookings, totalForServices, Booking } from "../data";
 
 type Props = { onBack: () => void; onBook: () => void };
 
@@ -29,8 +29,7 @@ export default function MyBookings({ onBack, onBook }: Props) {
   const getStylistName = (id: number | null) =>
     id ? (STYLISTS.find(s => s.id === id)?.name ?? "Any available") : "Any available";
 
-  const getTotal = (ids: number[]) =>
-    SERVICES.filter(s => ids.includes(s.id)).reduce((sum, s) => sum + s.price, 0);
+  const getTotal = (ids: number[], notes = "") => totalForServices(ids, notes);
 
   return (
     <div className="page">
@@ -116,7 +115,7 @@ export default function MyBookings({ onBack, onBook }: Props) {
                   <span>📅 {b.date}</span>
                   <span>🕐 {b.time}</span>
                   <span style={{ marginLeft: "auto", color: "var(--pink)", fontWeight: 800, fontSize: 20 }}>
-                    ₱{getTotal(b.serviceIds)}
+                    ₱{getTotal(b.serviceIds, b.notes)}
                   </span>
                 </div>
 
