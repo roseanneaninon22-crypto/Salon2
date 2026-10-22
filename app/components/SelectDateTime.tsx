@@ -1,4 +1,5 @@
 "use client";
+import SalonLogo from "./SalonLogo";
 import { useState } from "react";
 import { TIME_SLOTS } from "../data";
 
@@ -49,11 +50,7 @@ export default function SelectDateTime({ selectedDate, selectedTime, onDateChang
       {/* Navbar */}
       <nav className="site-nav">
         <div className="site-nav-brand">
-          <div className="logo-circle"><span>💇</span></div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15, color: "var(--pink)" }}>RosseyGirl</p>
-            <p style={{ fontSize: 9, color: "var(--gold)", letterSpacing: 3 }}>SALON</p>
-          </div>
+          <SalonLogo />
         </div>
         <button className="btn-ghost" onClick={onBack} style={{ fontSize: 13 }}>‹ Back</button>
       </nav>

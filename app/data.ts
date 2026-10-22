@@ -322,7 +322,7 @@ export type Booking = {
   customer: string;
   phone: string;
   serviceIds: number[];
-  stylistId: number | null;
+  stylistId: string | null;
   date: string;
   time: string;
   notes: string;

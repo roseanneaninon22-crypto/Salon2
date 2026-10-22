@@ -1,20 +1,20 @@
 "use client";
+import SalonLogo from "./SalonLogo";
 import { useEffect, useRef } from "react";
-import { SERVICES, STYLISTS, saveBooking, HairType } from "../data";
+import { SERVICES, saveBooking, HairType } from "../data";
 
 type Props = {
-  serviceIds: number[]; stylistId: number | null;
+  serviceIds: number[]; stylistId: string | null; stylistName: string | null;
   date: string; time: string;
   chosen: Record<number, HairType>;
   customerName: string; customerPhone: string; customerNotes: string;
   onDone: () => void; onNewBooking: () => void;
 };
 
-export default function BookingConfirm({ serviceIds, stylistId, date, time, chosen, customerName, customerPhone, customerNotes, onDone, onNewBooking }: Props) {
+export default function BookingConfirm({ serviceIds, stylistId, stylistName, date, time, chosen, customerName, customerPhone, customerNotes, onDone, onNewBooking }: Props) {
   const saved = useRef(false);
 
   const services = SERVICES.filter(s => serviceIds.includes(s.id));
-  const stylist  = stylistId ? STYLISTS.find(s => s.id === stylistId) : null;
   const priceOf  = (s: { id: number; price: number; priced?: boolean }) =>
     s.priced ? (chosen[s.id]?.price ?? 0) : s.price;
   const total    = services.reduce((sum, s) => sum + priceOf(s), 0);
@@ -37,11 +37,7 @@ export default function BookingConfirm({ serviceIds, stylistId, date, time, chos
       {/* Navbar */}
       <nav className="site-nav">
         <div className="site-nav-brand">
-          <div className="logo-circle"><span>💇</span></div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15, color: "var(--pink)" }}>RosseyGirl</p>
-            <p style={{ fontSize: 9, color: "var(--gold)", letterSpacing: 3 }}>SALON</p>
-          </div>
+          <SalonLogo />
         </div>
       </nav>
 
@@ -71,7 +67,7 @@ export default function BookingConfirm({ serviceIds, stylistId, date, time, chos
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
               {[
                 ["Services",  services.map(s => chosen[s.id] ? `${s.name} (${chosen[s.id].name})` : s.name).join(", ")],
-                ["Stylist",   stylist ? stylist.name : "Any available"],
+                ["Stylist",   stylistName || "Any available"],
                 ["Date",      date],
                 ["Time",      time],
                 ["Customer",  customerName],

@@ -1,6 +1,10 @@
 "use client";
-import { useState } from "react";
-import { CATEGORIES, SERVICES, HairType } from "../data";
+import SalonLogo from "./SalonLogo";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import { CATEGORIES, HairType } from "../data";
+
+type DBService = { id: string; name: string; category: string; duration: string; price: number; img: string; };
 
 type Props = { selected: number[]; onToggle: (id: number) => void; onNext: () => void; onBack: () => void;
   chosen: Record<number, HairType>; onChoose: (serviceId: number, t: HairType) => void;
@@ -53,18 +57,41 @@ function TypeList({ service, booked, onBook }: {
 }
 
 export default function SelectService({ selected, onToggle, onNext, onBack, chosen, onChoose, initialCategory }: Props) {
-  /* Which category is open; defaults to the first one (or the one clicked on the home page) */
   const [activeCat, setActiveCat] = useState<string>(initialCategory || CATEGORIES[0].label);
-  /* Which service inside the category has its types expanded */
   const [openSvc, setOpenSvc] = useState<number | null>(null);
+  const [dbServices, setDbServices] = useState<DBService[]>([]);
 
+  useEffect(() => {
+    supabase.from("services").select("*").order("created_at", { ascending: true })
+      .then(({ data }) => { if (data) setDbServices(data); });
+  }, []);
+
+  // Build categories from DB services, falling back to static CATEGORIES structure for types/priced info
   const category = CATEGORIES.find(c => c.label === activeCat) ?? CATEGORIES[0];
+
+  // Merge DB services into the category: use DB price/name/img but keep static type info
+  const mergedServices = category.services.map(staticSvc => {
+    const dbMatch = dbServices.find(d => d.name.toLowerCase() === staticSvc.name.toLowerCase() && d.category === activeCat);
+    return dbMatch ? { ...staticSvc, price: dbMatch.price, duration: dbMatch.duration, img: dbMatch.img } : staticSvc;
+  });
+
+  // Also include any DB-only services in this category not in static list
+  const staticNames = category.services.map(s => s.name.toLowerCase());
+  const extraDbServices = dbServices
+    .filter(d => d.category === activeCat && !staticNames.includes(d.name.toLowerCase()))
+    .map((d, i) => ({
+      id: 1000 + i,
+      name: d.name, desc: d.name, duration: d.duration,
+      price: d.price, img: d.img, category: d.category,
+    }));
+
+  const allServices = [...mergedServices, ...extraDbServices];
 
   /* Price of a service: the chosen type's price for priced services, else its fixed price */
   const priceOf = (s: { id: number; price: number } & Priced) =>
     s.priced ? (chosen[s.id]?.price ?? 0) : s.price;
 
-  const total = SERVICES.filter(s => selected.includes(s.id))
+  const total = allServices.filter(s => selected.includes(s.id))
     .reduce((sum, s) => sum + priceOf(s), 0);
 
   const switchCategory = (label: string) => {
@@ -89,11 +116,7 @@ export default function SelectService({ selected, onToggle, onNext, onBack, chos
       {/* Navbar */}
       <nav className="site-nav">
         <div className="site-nav-brand">
-          <div className="logo-circle"><span>💇</span></div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15, color: "var(--pink)" }}>RosseyGirl</p>
-            <p style={{ fontSize: 9, color: "var(--gold)", letterSpacing: 3 }}>SALON</p>
-          </div>
+          <SalonLogo />
         </div>
         <button className="btn-ghost" onClick={onBack} style={{ fontSize: 13 }}>‹ Back to Home</button>
       </nav>
@@ -152,7 +175,7 @@ export default function SelectService({ selected, onToggle, onNext, onBack, chos
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {category.services.map(s => {
+                {allServices.map(s => {
                   const isOpen = openSvc === s.id;
                   const choice = chosen[s.id];
                   const isSelected = selected.includes(s.id);
@@ -228,7 +251,7 @@ export default function SelectService({ selected, onToggle, onNext, onBack, chos
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                {SERVICES.filter(s => selected.includes(s.id)).map(s => (
+                {allServices.filter(s => selected.includes(s.id)).map(s => (
                   <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ fontSize: 18 }}>{s.img}</span>

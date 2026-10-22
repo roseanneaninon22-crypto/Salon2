@@ -1,28 +1,22 @@
 "use client";
 import { SERVICES, CATEGORIES, servicePrice } from "../data";
+import SalonLogo from "./SalonLogo";
 
-type Props = { onBook: (category?: string) => void; onMyBookings: () => void; onLogout: () => void; userName: string };
+type Props = { onBook: (category?: string) => void; onMyBookings: () => void; onAbout: () => void; onLogout: () => void; userName: string };
 
-export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }: Props) {
+export default function HomeScreen({ onBook, onMyBookings, onAbout, onLogout, userName }: Props) {
   return (
     <div className="page">
 
       {/* ── Top Navbar ── */}
       <nav className="site-nav">
-        <div className="site-nav-brand">
-          <div className="logo-circle"><span>💇</span></div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15, color: "var(--pink)" }}>RosseyGirl</p>
-            <p style={{ fontSize: 9, color: "var(--gold)", letterSpacing: 3 }}>SALON</p>
-          </div>
-        </div>
+        <SalonLogo />
 
         <div className="site-nav-links">
           <button className="site-nav-link active">Home</button>
           <button className="site-nav-link" onClick={() => onBook()}>Services</button>
           <button className="site-nav-link" onClick={onMyBookings}>My Bookings</button>
-          <button className="site-nav-link">About</button>
-          <button className="site-nav-link">Contact</button>
+          <button className="site-nav-link" onClick={onAbout}>About</button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -136,38 +130,20 @@ export default function HomeScreen({ onBook, onMyBookings, onLogout, userName }:
           background: "linear-gradient(135deg, rgba(232,25,125,0.15) 0%, rgba(180,60,20,0.1) 100%)",
           borderTop: "1px solid rgba(232,25,125,0.12)",
           borderBottom: "1px solid rgba(232,25,125,0.12)",
-          padding: "60px 40px",
+          padding: "22px 20px",
           textAlign: "center",
         }}>
-          <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
             Ready for Your Next Appointment?
           </h2>
-          <p style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 28 }}>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
             Book in minutes and let our experts take care of the rest.
           </p>
-          <button className="btn-pink" onClick={() => onBook()} style={{ padding: "16px 48px", fontSize: 16, borderRadius: 12 }}>
+          <button className="btn-pink" onClick={() => onBook()} style={{ padding: "10px 26px", fontSize: 13, borderRadius: 9 }}>
             Book an Appointment
           </button>
         </section>
 
-        {/* ── Footer ── */}
-        <footer style={{
-          background: "rgba(0,0,0,0.3)",
-          borderTop: "1px solid rgba(201,168,76,0.1)",
-          padding: "30px 40px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="logo-circle" style={{ width: 36, height: 36, fontSize: 16 }}><span>💇</span></div>
-            <div>
-              <p style={{ fontWeight: 800, fontSize: 13, color: "var(--pink)" }}>RosseyGirl Salon</p>
-              <p style={{ fontSize: 10, color: "var(--text-muted)" }}>© 2026 All rights reserved</p>
-            </div>
-          </div>
-          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Made with ♥ for beauty lovers</p>
-        </footer>
       </div>
     </div>
   );

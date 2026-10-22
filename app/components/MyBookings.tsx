@@ -1,151 +1,214 @@
 "use client";
+import SalonLogo from "./SalonLogo";
 import { useState, useEffect } from "react";
-import { SERVICES, STYLISTS, getBookings, totalForServices, Booking } from "../data";
+import { supabase } from "../lib/supabase";
+
+type Booking = {
+  id: string;
+  user_id?: string;
+  services: string;
+  stylist: string;
+  date: string;
+  time: string;
+  status: string;
+  total: number;
+  rated?: boolean;
+  created_at?: string;
+};
 
 type Props = { onBack: () => void; onBook: () => void };
-
-const TABS = ["All", "Pending", "Confirmed", "Cancelled"];
+const TABS = ["Upcoming", "Completed", "Cancelled"];
 
 export default function MyBookings({ onBack, onBook }: Props) {
-  const [tab, setTab]         = useState(0);
+  const [tab, setTab] = useState(0);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
+  const [stars, setStars] = useState(5);
+  const [ratingLoading, setRatingLoading] = useState(false);
 
-  // Load from localStorage on mount and whenever tab changes
   useEffect(() => {
-    setBookings(getBookings());
-  }, [tab]);
+    let disposed = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const realtimeChanges = new Map<string, Booking | null>();
+
+    const fetch = async () => {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { if (!disposed) setLoading(false); return; }
+
+      channel = supabase
+        .channel(`bookings-for-${user.id}`)
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "bookings",
+          filter: `user_id=eq.${user.id}`,
+        }, payload => {
+          if (payload.eventType === "DELETE") {
+            const removed = payload.old as Partial<Booking>;
+            if (!removed.id) return;
+            realtimeChanges.set(removed.id, null);
+            setBookings(current => current.filter(booking => booking.id !== removed.id));
+            return;
+          }
+
+          const changed = payload.new as Booking;
+          if (!changed.id) return;
+          realtimeChanges.set(changed.id, changed);
+          setBookings(current => current.some(booking => booking.id === changed.id)
+            ? current.map(booking => booking.id === changed.id ? { ...booking, ...changed } : booking)
+            : [changed, ...current]);
+        })
+        .subscribe();
+
+      const { data } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (disposed) return;
+
+      const latest = new Map((data ?? []).map(booking => [booking.id, booking]));
+      for (const [id, booking] of realtimeChanges) {
+        if (booking) latest.set(id, booking);
+        else latest.delete(id);
+      }
+      setBookings([...latest.values()]);
+      setLoading(false);
+    };
+    void fetch();
+
+    return () => {
+      disposed = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, []);
 
   const filtered = bookings.filter(b => {
-    if (tab === 0) return true;
-    if (tab === 1) return b.status === "pending";
-    if (tab === 2) return b.status === "confirmed";
-    if (tab === 3) return b.status === "cancelled";
-    return true;
+    if (tab === 0) return b.status === "pending" || b.status === "confirmed";
+    if (tab === 1) return b.status === "completed";
+    return b.status === "cancelled";
   });
 
-  const getServiceNames = (ids: number[]) =>
-    SERVICES.filter(s => ids.includes(s.id)).map(s => s.name).join(", ");
+  const cancel = async (id: string) => {
+    const booking = bookings.find(item => item.id === id);
+    if (!booking || booking.status !== "pending") return;
+    const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id);
+    if (error) {
+      window.alert(`Could not cancel appointment: ${error.message}`);
+      return;
+    }
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: "cancelled" } : b));
+  };
 
-  const getStylistName = (id: number | null) =>
-    id ? (STYLISTS.find(s => s.id === id)?.name ?? "Any available") : "Any available";
-
-  const getTotal = (ids: number[], notes = "") => totalForServices(ids, notes);
+  const submitRating = async () => {
+    if (!ratingBooking) return;
+    setRatingLoading(true);
+    // Get current stylist rating
+    const { data: stylist } = await supabase
+      .from("stylists")
+      .select("rating, rating_count")
+      .ilike("name", ratingBooking.stylist.split(" ")[0] + "%")
+      .single();
+    if (stylist) {
+      const count = (stylist.rating_count ?? 0) + 1;
+      const newRating = ((stylist.rating ?? 0) * (count - 1) + stars) / count;
+      await supabase.from("stylists")
+        .update({ rating: Math.round(newRating * 10) / 10, rating_count: count })
+        .ilike("name", ratingBooking.stylist.split(" ")[0] + "%");
+    }
+    await supabase.from("bookings").update({ rated: true }).eq("id", ratingBooking.id);
+    setBookings(prev => prev.map(b => b.id === ratingBooking.id ? { ...b, rated: true } : b));
+    setRatingBooking(null);
+    setRatingLoading(false);
+  };
 
   return (
     <div className="page">
-      {/* ── Top Navbar (website style) ── */}
-      <nav className="site-nav">
-        <div className="site-nav-brand">
-          <div className="logo-circle"><span>💇</span></div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15, color: "var(--pink)" }}>RosseyGirl</p>
-            <p style={{ fontSize: 9, color: "var(--gold)", letterSpacing: 3 }}>SALON</p>
+      {/* Rating Modal */}
+      {ratingBooking && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+          <div style={{ background: "#1a1a1a", border: "1px solid rgba(232,25,125,0.3)", borderRadius: 16, padding: 28, width: 320, textAlign: "center" }}>
+            <p style={{ fontWeight: 700, fontSize: 16, color: "var(--gold)", marginBottom: 6 }}>Rate Your Stylist</p>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 20 }}>{ratingBooking.stylist}</p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 24 }}>
+              {[1,2,3,4,5].map(n => (
+                <span key={n} onClick={() => setStars(n)}
+                  style={{ fontSize: 32, cursor: "pointer", color: n <= stars ? "#ffc107" : "rgba(255,255,255,0.2)", transition: "color 0.15s" }}>★</span>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn-outline" style={{ fontSize: 13 }} onClick={() => setRatingBooking(null)}>Cancel</button>
+              <button className="btn-pink" style={{ fontSize: 13 }} onClick={submitRating} disabled={ratingLoading}>
+                {ratingLoading ? "Submitting..." : "Submit Rating"}
+              </button>
+            </div>
           </div>
         </div>
-        <div className="site-nav-links">
-          <button className="site-nav-link" onClick={onBack}>Home</button>
-          <button className="site-nav-link" onClick={onBook}>Services</button>
-          <button className="site-nav-link active">My Bookings</button>
+      )}
+
+      <nav className="site-nav">
+        <div className="site-nav-brand">
+          <SalonLogo />
         </div>
         <button className="btn-ghost" onClick={onBack} style={{ fontSize: 13 }}>‹ Back to Home</button>
       </nav>
 
       <div className="page-content">
-        {/* Breadcrumb */}
-        <div className="breadcrumb">
-          <span onClick={onBack}>Home</span>
-          <span className="breadcrumb-sep">›</span>
-          <span className="breadcrumb-current">My Bookings</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+          <h1 className="page-title" style={{ margin: 0 }}>My Bookings</h1>
+          <button className="btn-pink" onClick={onBook} style={{ width: "auto", padding: "10px 24px", borderRadius: 10 }}>+ New Booking</button>
         </div>
 
-        {/* Page header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
-          <div>
-            <h1 className="page-title">My Bookings</h1>
-            <p className="page-subtitle" style={{ marginBottom: 0 }}>Track and manage all your salon appointments in one place</p>
-          </div>
-          <button className="btn-pink" onClick={onBook} style={{ padding: "12px 28px", borderRadius: 10 }}>
-            + New Appointment
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 24, borderBottom: "1px solid rgba(201,168,76,0.12)", paddingBottom: 12 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
           {TABS.map((t, i) => (
             <button key={t} onClick={() => setTab(i)} style={{
-              padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-              cursor: "pointer",
-              border: i === tab ? "none" : "1.5px solid rgba(201,168,76,0.25)",
+              padding: "9px 20px", borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: "pointer",
+              border: i === tab ? "none" : "1.5px solid var(--pink)",
               background: i === tab ? "linear-gradient(135deg,#e8197d,#b5105e)" : "transparent",
-              color: i === tab ? "#fff" : "var(--text-muted)",
-              transition: "all 0.15s",
-            }}>
-              {t}
-            </button>
+              color: i === tab ? "#fff" : "var(--pink)"
+            }}>{t}</button>
           ))}
         </div>
 
-        {/* Bookings grid */}
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "80px 0" }}>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>Loading bookings...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60 }}>
             <p style={{ fontSize: 48, marginBottom: 14 }}>📋</p>
-            <p style={{ fontWeight: 700, fontSize: 18, color: "var(--gold)" }}>No bookings found</p>
-            <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>
-              {tab === 0 ? "You haven't made any reservations yet." : `No ${TABS[tab].toLowerCase()} bookings.`}
-            </p>
-            <button className="btn-pink" onClick={onBook} style={{ marginTop: 24, borderRadius: 10 }}>Book Now</button>
+            <p style={{ color: "var(--text-muted)", fontSize: 15 }}>No bookings found</p>
+            <button className="btn-pink" onClick={onBook} style={{ marginTop: 20, width: "auto", padding: "12px 32px", borderRadius: 10 }}>Book Now</button>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {filtered.map(b => (
-              <div key={b.id} className="card" style={{ padding: 24 }}>
-                {/* Header row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                  <div style={{ flex: 1, marginRight: 12 }}>
-                    <p style={{ fontWeight: 800, fontSize: 17 }}>{getServiceNames(b.serviceIds)}</p>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{getStylistName(b.stylistId)}</p>
+              <div key={b.id} className="card" style={{ padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 15 }}>{b.services}</p>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{b.stylist}</p>
                   </div>
                   <span className={`badge badge-${b.status}`}>{b.status}</span>
                 </div>
-
-                <div className="divider" style={{ margin: "14px 0" }} />
-
-                {/* Info row */}
-                <div style={{ display: "flex", gap: 20, fontSize: 13, color: "var(--text-muted)", alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text-muted)", alignItems: "center" }}>
                   <span>📅 {b.date}</span>
                   <span>🕐 {b.time}</span>
-                  <span style={{ marginLeft: "auto", color: "var(--pink)", fontWeight: 800, fontSize: 20 }}>
-                    ₱{getTotal(b.serviceIds, b.notes)}
-                  </span>
+                  <span style={{ marginLeft: "auto", color: "var(--pink)", fontWeight: 800, fontSize: 16 }}>₱{b.total}</span>
                 </div>
-
-                {/* Status message */}
                 {b.status === "pending" && (
-                  <div style={{
-                    marginTop: 14, padding: "10px 14px", borderRadius: 10,
-                    background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
-                    fontSize: 12, color: "#ffc107",
-                  }}>
-                    ⏳ Waiting for stylist approval
+                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                    <button className="btn-outline" style={{ padding: "8px 20px", fontSize: 12 }} onClick={() => cancel(b.id)}>Cancel</button>
                   </div>
                 )}
-                {b.status === "confirmed" && (
-                  <div style={{
-                    marginTop: 14, padding: "10px 14px", borderRadius: 10,
-                    background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.2)",
-                    fontSize: 12, color: "#4caf50",
-                  }}>
-                    ✓ Your appointment is confirmed!
+                {b.status === "completed" && !b.rated && (
+                  <div style={{ marginTop: 14 }}>
+                    <button className="btn-pink" style={{ width: "auto", padding: "8px 20px", fontSize: 12, borderRadius: 10 }}
+                      onClick={() => { setStars(5); setRatingBooking(b); }}>★ Rate Stylist</button>
                   </div>
                 )}
-                {b.status === "cancelled" && (
-                  <div style={{
-                    marginTop: 14, padding: "10px 14px", borderRadius: 10,
-                    background: "rgba(244,67,54,0.08)", border: "1px solid rgba(244,67,54,0.2)",
-                    fontSize: 12, color: "#f44336",
-                  }}>
-                    ✕ This appointment was cancelled
-                  </div>
+                {b.status === "completed" && b.rated && (
+                  <p style={{ marginTop: 12, fontSize: 12, color: "#ffc107" }}>✅ You rated this booking</p>
                 )}
               </div>
             ))}
