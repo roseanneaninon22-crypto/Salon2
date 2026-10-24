@@ -12,15 +12,39 @@ export default function ChooseStylist({ selected, onSelect, onNext, onBack }: Pr
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let isActive = true;
+
     const loadStylists = async () => {
       const { data, error } = await supabase
         .from("stylists")
         .select("id, name, role, rating, img, photo_url")
         .order("created_at", { ascending: true });
-      if (error) setLoadError(error.message);
-      else setDatabaseStylists((data ?? []) as Stylist[]);
+      if (!isActive) return;
+      if (error) {
+        setLoadError(error.message);
+        return;
+      }
+      setLoadError("");
+      setDatabaseStylists((data ?? []) as Stylist[]);
     };
+
     void loadStylists();
+
+    const channel = supabase
+      .channel(`customer-stylists-live-${crypto.randomUUID()}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "stylists",
+      }, () => {
+        void loadStylists();
+      })
+      .subscribe();
+
+    return () => {
+      isActive = false;
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const stylists: Stylist[] = [
@@ -77,8 +101,8 @@ export default function ChooseStylist({ selected, onSelect, onNext, onBack }: Pr
                 background: "linear-gradient(135deg,rgba(232,25,125,0.2),rgba(180,80,20,0.2))",
                 border: `3px solid ${selected === s.id ? "var(--pink)" : "rgba(201,168,76,0.2)"}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-color 0.2s",
-              }}>{s.photo_url ? <img src={s.photo_url} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : s.img}</div>
+                transition: "border-color 0.2s", overflow: "hidden",
+              }}>{s.photo_url ? <img src={s.photo_url} alt={`${s.name} profile photo`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : s.img}</div>
               <div>
                 <p style={{ fontWeight: 800, fontSize: 16 }}>{s.name}</p>
                 <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{s.role}</p>

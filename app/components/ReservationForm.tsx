@@ -5,14 +5,14 @@ import { supabase } from "../lib/supabase";
 import { SERVICES, HairType } from "../data";
 
 type Props = {
-  serviceIds: number[]; stylistName: string | null;
+  serviceIds: number[]; stylistId: string | null; stylistName: string | null;
   date: string; time: string;
   chosen: Record<number, HairType>;
   onConfirm: (info: { name: string; phone: string; notes: string }) => void;
   onBack: () => void;
 };
 
-export default function ReservationForm({ serviceIds, stylistName, date, time, chosen, onConfirm, onBack }: Props) {
+export default function ReservationForm({ serviceIds, stylistId, stylistName, date, time, chosen, onConfirm, onBack }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
@@ -57,6 +57,7 @@ export default function ReservationForm({ serviceIds, stylistName, date, time, c
 
     const { error: err } = await supabase.from("bookings").insert({
       user_id: user?.id ?? null,
+      stylist_id: stylistId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stylistId) ? stylistId : null,
       customer_name: name,
       customer_phone: phone,
       services: services.map(s => chosen[s.id] ? `${s.name} (${chosen[s.id].name})` : s.name).join(", "),
@@ -65,11 +66,17 @@ export default function ReservationForm({ serviceIds, stylistName, date, time, c
       time,
       notes: fullNotes,
       total,
+      payment_method: "Cash",
       status: "pending",
     });
 
     setLoading(false);
-    if (err) { setError("Failed to save booking: " + err.message); return; }
+    if (err) {
+      setError(err.code === "23505"
+        ? "This stylist is already booked for that date and time. Please go back and choose another time or stylist."
+        : "Failed to save booking: " + err.message);
+      return;
+    }
     onConfirm({ name, phone, notes });
   };
 
@@ -112,6 +119,12 @@ export default function ReservationForm({ serviceIds, stylistName, date, time, c
               <span style={{ fontWeight: 700, fontSize: 15 }}>Total</span>
               <span style={{ fontWeight: 800, fontSize: 20, color: "var(--pink)" }}>₱{total}</span>
             </div>
+          </div>
+
+          <div className="card" style={{ padding: 24 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", letterSpacing: 1.5, marginBottom: 10 }}>PAYMENT METHOD</p>
+            <p style={{ fontSize: 15, fontWeight: 700 }}>Cash only</p>
+            <p style={{ marginTop: 5, fontSize: 12, color: "var(--text-muted)" }}>Please pay at the salon after your appointment.</p>
           </div>
 
           <div className="card" style={{ padding: 24 }}>

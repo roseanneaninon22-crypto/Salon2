@@ -1,15 +1,40 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import SalonLogo from "./SalonLogo";
 
-type Props = { onLogin: (role: "user" | "admin") => void };
+type AppRole = "user" | "admin" | "stylist";
+type Props = {
+  onLogin: (role: AppRole) => void;
+  onClose?: () => void;
+  initialMode?: "login" | "signup";
+  modal?: boolean;
+};
 
-export default function AuthScreen({ onLogin }: Props) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+async function getAppRole(userId: string) {
+  const { data: profile } = await supabase.from("users").select("role").eq("user_id", userId).maybeSingle();
+  if (profile?.role === "admin") return "admin" as const;
+  if (profile?.role === "stylist") return "stylist" as const;
+  const { data: stylist } = await supabase.from("stylists").select("id").eq("user_id", userId).maybeSingle();
+  return stylist ? "stylist" as const : "user" as const;
+}
+
+function formatOtpSendError(error: { message: string; status?: number; code?: string }) {
+  if (error.status === 500) {
+    return "Supabase could not send the email code (Auth error 500). Check that Custom SMTP is enabled, then inspect the matching Auth Log for the SMTP or template error.";
+  }
+  if (error.status === 429) return "Too many email code requests. Wait before requesting another code.";
+  return `${error.message}${error.code ? ` (${error.code})` : ""}`;
+}
+
+export default function AuthScreen({ onLogin, onClose, initialMode = "login", modal = false }: Props) {
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
+  const compactCard = modal;
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const otpInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [otpSent, setOtpSent] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
   const [loginMethod, setLoginMethod] = useState<"otp" | "password">("otp");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -17,6 +42,14 @@ export default function AuthScreen({ onLogin }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendSeconds(seconds => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds > 0]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); setSuccess("");
@@ -33,20 +66,18 @@ export default function AuthScreen({ onLogin }: Props) {
         });
         if (loginError) setError(loginError.message);
         else if (data.user) {
-          const { data: customer } = await supabase.from("users").select("role").eq("user_id", data.user.id).maybeSingle();
-          onLogin(customer?.role === "admin" ? "admin" : "user");
+          onLogin(await getAppRole(data.user.id));
         }
       } else if (!otpSent) {
         const normalizedEmail=email.trim().toLowerCase();
         const {error:sendError}=await supabase.auth.signInWithOtp({email:normalizedEmail,options:{shouldCreateUser:mode==="signup",...(mode==="signup"?{data:{full_name:name.trim(),phone,role:"user"}}:{})}});
-        if(sendError) setError(sendError.message); else {setOtpSent(true);setSuccess("A one-time code was sent to "+normalizedEmail+".");}
+        if(sendError) setError(formatOtpSendError(sendError)); else {setOtpSent(true);setResendSeconds(60);setSuccess("A one-time code was sent to "+normalizedEmail+".");}
       } else {
         const {data,error:verifyError}=await supabase.auth.verifyOtp({email:email.trim().toLowerCase(),token:otp.join(""),type:"email"});
         if(verifyError) setError(verifyError.message); else if(data.user) {
-          const {data:customer}=await supabase.from("users").select("role").eq("user_id",data.user.id).maybeSingle();
-          // The email is verified and the session is valid even if the profile API is not exposed yet.
-          // Fall back to a normal user; admin status must come from the protected profile row.
-          onLogin(customer?.role==="admin"?"admin":"user");
+          const role = await getAppRole(data.user.id);
+          // Use the application profile or stylist assignment to choose the dashboard.
+          onLogin(role);
         }
       }
     } catch {setError("Something went wrong. Please try again.");}
@@ -55,7 +86,7 @@ export default function AuthScreen({ onLogin }: Props) {
   const resendOtp=async()=>{
     setError("");setSuccess("");setLoading(true);
     const {error:sendError}=await supabase.auth.signInWithOtp({email:email.trim().toLowerCase(),options:{shouldCreateUser:mode==="signup",...(mode==="signup"?{data:{full_name:name.trim(),phone,role:"user"}}:{})}});
-    if(sendError)setError(sendError.message);else setSuccess("A new one-time code was sent to "+email.trim()+".");
+    if(sendError)setError(formatOtpSendError(sendError));else {setResendSeconds(60);setSuccess("A new one-time code was sent to "+email.trim()+".");}
     setLoading(false);
   };
 
@@ -86,39 +117,37 @@ export default function AuthScreen({ onLogin }: Props) {
   };
 
   return (
-    <div style={{
+    <div className={modal ? "auth-modal-overlay" : undefined} role={modal ? "dialog" : undefined} aria-modal={modal || undefined} style={{
+      ...(modal ? {
+        position: "fixed" as const, inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,.78)", display: "flex",
+        alignItems: "center", justifyContent: "center", padding: 16,
+        overflowY: "auto" as const,
+      } : {}),
       minHeight: "100vh", width: "100%", boxSizing: "border-box",
-      background: "#100803",
+      background: modal ? "rgba(0,0,0,.78)" : "#100803",
       display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 0,
+      padding: modal ? 16 : 0,
     }}>
-      <div className="auth-layout" style={{
-        width: "100%", maxWidth: "none", minHeight: "100vh",
-        display: "grid", gridTemplateColumns: "1.15fr 0.85fr",
-        background: "#170b05", borderRadius: 0,
-        border: "none",
+      <div className={`auth-layout${modal ? " auth-modal-layout" : ""}${compactCard ? " auth-card-only" : ""}`} style={{
+        width: modal ? (compactCard ? "min(100%, 440px)" : "min(100%, 980px)") : "100%", maxWidth: modal ? (compactCard ? 440 : 980) : "none", minHeight: modal ? (compactCard ? "0" : "min(680px, calc(100vh - 32px))") : "100vh",
+        display: "grid", gridTemplateColumns: compactCard ? "1fr" : "1.15fr 0.85fr",
+        background: "#170b05", borderRadius: modal ? 18 : 0,
+        border: modal ? "1px solid rgba(201,168,76,.38)" : "none",
         overflow: "hidden",
         position: "relative",
+        boxShadow: modal ? "0 24px 90px rgba(0,0,0,.6)" : "none",
       }}>
-        <section className="auth-hero" style={{ minHeight: 600, display: "flex", alignItems: "center", padding: "48px 52px", backgroundImage: "linear-gradient(90deg, rgba(8,5,2,.72), rgba(8,5,2,.18)), linear-gradient(0deg, rgba(8,5,2,.58), transparent 70%), url('/back.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
+        {modal && onClose && <button type="button" onClick={onClose} aria-label="Close sign in" className="auth-modal-close">×</button>}
+        {!compactCard && <section className="auth-hero" style={{ minHeight: 600, display: "flex", alignItems: "center", padding: "48px 52px", backgroundImage: "linear-gradient(90deg, rgba(8,5,2,.72), rgba(8,5,2,.18)), linear-gradient(0deg, rgba(8,5,2,.58), transparent 70%), url('/back.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
           <div style={{ maxWidth: 420 }}>
-            <div style={{ color: "var(--pink)", fontSize: 22, fontWeight: 900, letterSpacing: 2 }}>
-              <span style={{ position: "relative", display: "inline-block" }}>
-                <img src="/crown.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 21, height: 17, objectFit: "contain", left: "50%", top: -14, transform: "translateX(-50%)" }} />
-                R
-              </span>OSSEY GIRL
-            </div>
-            <div style={{ width: 150, display: "flex", alignItems: "center", gap: 9, color: "rgba(255,255,255,.8)", fontSize: 9, letterSpacing: 5, margin: "5px 0 50px 36px" }}>
-              <span style={{ flex: 1, height: 1, background: "rgba(255,255,255,.45)" }} />
-              <span>SALON</span>
-              <span style={{ flex: 1, height: 1, background: "rgba(255,255,255,.45)" }} />
-            </div>
+            <div style={{ marginBottom: 50 }}><SalonLogo /></div>
             <h2 style={{ fontSize: "clamp(30px, 4vw, 42px)", lineHeight: 1.12, fontWeight: 850, color: "#fff", margin: 0 }}>Look Good.<br />Feel Great.<br /><span style={{ color: "#f2c94c" }}>Be Confident.</span></h2>
             <p style={{ maxWidth: 310, color: "rgba(255,255,255,.75)", fontSize: 13, lineHeight: 1.65, marginTop: 18 }}>Book your appointment online in minutes — choose your service, pick your stylist, and let our experts take care of the rest.</p>
           </div>
-        </section>
-        <section className="auth-form-panel" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 32px", background: "#170b05" }}>
-        <div style={{ width: "100%", maxWidth: 390, padding: "28px 24px", background: "rgba(25,14,8,.88)", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", boxShadow: "0 20px 60px rgba(0,0,0,.28)" }}>
+        </section>}
+        <section className="auth-form-panel" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: compactCard ? "0" : "40px 32px", background: "#170b05" }}>
+        <div style={{ width: "100%", maxWidth: 390, padding: compactCard ? "28px 30px" : "28px 24px", background: compactCard ? "transparent" : "rgba(25,14,8,.88)", borderRadius: 16, border: compactCard ? "0" : "1px solid rgba(255,255,255,.12)", boxShadow: compactCard ? "none" : "0 20px 60px rgba(0,0,0,.28)" }}>
         {/* Decorative right side */}
         <div style={{ display: "none",
           position: "absolute", top: 0, right: 0,
@@ -253,14 +282,16 @@ export default function AuthScreen({ onLogin }: Props) {
           </form>
 
           {otpSent && <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, fontSize: 12 }}>
-            <button type="button" onClick={resendOtp} disabled={loading} style={{ padding: 0, border: 0, background: "none", color: "var(--pink)", cursor: loading ? "not-allowed" : "pointer" }}>Resend code</button>
-            <button type="button" onClick={() => { setOtpSent(false); clearOtp(); setSuccess(""); setError(""); }} style={{ padding: 0, border: 0, background: "none", color: "rgba(255,255,255,.65)", cursor: "pointer" }}>Change email</button>
+            <button type="button" onClick={resendOtp} disabled={loading || resendSeconds > 0} style={{ padding: 0, border: 0, background: "none", color: resendSeconds > 0 ? "rgba(255,255,255,.45)" : "var(--pink)", cursor: loading || resendSeconds > 0 ? "not-allowed" : "pointer" }}>
+              {resendSeconds > 0 ? `Resend code in 00:${String(resendSeconds).padStart(2, "0")}` : "Resend code"}
+            </button>
+            <button type="button" onClick={() => { setOtpSent(false); setResendSeconds(0); clearOtp(); setSuccess(""); setError(""); }} style={{ padding: 0, border: 0, background: "none", color: "rgba(255,255,255,.65)", cursor: "pointer" }}>Change email</button>
           </div>}
 
           <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
             {mode === "login" ? "Don't have an account? " : "Already have an account? "}
             <span style={{ color: "var(--pink)", fontWeight: 700, cursor: "pointer" }}
-              onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLoginMethod("otp"); setPassword(""); setOtpSent(false); clearOtp(); setError(""); setSuccess(""); }}>
+              onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLoginMethod("otp"); setPassword(""); setOtpSent(false); setResendSeconds(0); clearOtp(); setError(""); setSuccess(""); }}>
               {mode === "login" ? "Sign Up" : "Log In"}
             </span>
           </p>

@@ -1,5 +1,6 @@
 "use client";
 import SalonLogo from "./SalonLogo";
+import AboutFooter from "./AboutFooter";
 
 type Props = {
   onHome: () => void;
@@ -44,6 +45,7 @@ export default function AboutScreen({ onHome, onBook, onMyBookings, onLogout, us
           <h2>Welcome to Rosseygirl Salon</h2>
           <p>Welcome to <strong>Rosseygirl Salon</strong>, where beauty, confidence, and self-care come together. We are dedicated to providing quality salon services in a comfortable, welcoming, and relaxing environment.</p>
           <p>At Rosseygirl Salon, we believe that everyone deserves to feel beautiful and confident. Our goal is to provide professional beauty services while making every visit a pleasant and enjoyable experience.</p>
+          <p><strong>Please visit our branch in Poblacion, Oslob.</strong></p>
         </div>
       </section>
 
@@ -78,6 +80,7 @@ export default function AboutScreen({ onHome, onBook, onMyBookings, onLogout, us
         <p>Let Rosseygirl Salon take care of your beauty needs.</p>
         <button onClick={onBook}>♧ &nbsp; Book an Appointment</button>
       </section>
+      <AboutFooter onHome={onHome} onAbout={() => window.scrollTo({ top: 0, behavior: "smooth" })} onServices={onBook} onBook={onBook} onMyBookings={onMyBookings} />
     </main>
   );
 }

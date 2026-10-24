@@ -1,10 +1,12 @@
-"use client";
-import { SERVICES, CATEGORIES, servicePrice } from "../data";
+﻿"use client";
+import { FEATURED_SERVICES } from "../data";
 import SalonLogo from "./SalonLogo";
+import ServiceCard from "./ServiceCard";
+import AboutFooter from "./AboutFooter";
 
-type Props = { onBook: (category?: string) => void; onMyBookings: () => void; onAbout: () => void; onLogout: () => void; userName: string };
+type Props = { onBook: (category?: string) => void; onMyBookings: () => void; onMessages: () => void; onAbout: () => void; onLogout: () => void; onSeeAllServices: () => void; onOpenService: (serviceId: number) => void; userName: string };
 
-export default function HomeScreen({ onBook, onMyBookings, onAbout, onLogout, userName }: Props) {
+export default function HomeScreen({ onBook, onMyBookings, onMessages, onAbout, onLogout, onSeeAllServices, onOpenService, userName }: Props) {
   return (
     <div className="page">
 
@@ -16,7 +18,8 @@ export default function HomeScreen({ onBook, onMyBookings, onAbout, onLogout, us
           <button className="site-nav-link active">Home</button>
           <button className="site-nav-link" onClick={() => onBook()}>Services</button>
           <button className="site-nav-link" onClick={onMyBookings}>My Bookings</button>
-          <button className="site-nav-link" onClick={onAbout}>About</button>
+          <button className="site-nav-link" onClick={onMessages}>Messages</button>
+          <button className="site-nav-link" onClick={() => document.getElementById("customer-about")?.scrollIntoView({ behavior: "smooth" })}>About</button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -64,87 +67,36 @@ export default function HomeScreen({ onBook, onMyBookings, onAbout, onLogout, us
       {/* ── Main content ── */}
       <div style={{ flex: 1 }}>
 
-        {/* ── Service Categories ── */}
-        <section className="section" style={{ background: "rgba(255,255,255,0.01)" }}>
+        {/* ── Services (same display as the public landing page) ── */}
+        <section id="customer-services" className="landing-services section">
           <div className="container">
-            <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <p style={{ fontSize: 12, color: "var(--gold)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 10 }}>What We Offer</p>
-              <h2 style={{ fontSize: 32, fontWeight: 800 }}>Our Services</h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
-              {CATEGORIES.map(c => (
-                <div key={c.label} className="card card-hover" onClick={() => onBook(c.label)}
-                  style={{ padding: "28px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer", textAlign: "center" }}>
-                  <span style={{ fontSize: 36 }}>{c.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-light)" }}>{c.label}</span>
-                </div>
+            <p className="landing-eyebrow">What We Offer</p>
+            <h2>Beauty services made for you</h2>
+            <div className="landing-service-grid">
+              {FEATURED_SERVICES.map(service => (
+                <ServiceCard key={service.id} service={service} onExplore={() => onOpenService(service.id)} />
               ))}
             </div>
+            <button className="btn-outline landing-services-all" onClick={onSeeAllServices}>See All Services</button>
           </div>
         </section>
 
-        {/* ── Popular Services ── */}
-        <section className="section">
-          <div className="container">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
-              <div>
-                <p style={{ fontSize: 12, color: "var(--gold)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 8 }}>Top Picks</p>
-                <h2 style={{ fontSize: 28, fontWeight: 800 }}>Popular Services</h2>
-              </div>
-              <button className="btn-outline" onClick={() => onBook()} style={{ padding: "10px 24px" }}>View All Services</button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
-              {SERVICES.slice(0, 3).map(s => (
-                <div key={s.id} className="card card-hover" onClick={() => onBook()}
-                  style={{ padding: 24, cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-                    <div style={{
-                      width: 60, height: 60, borderRadius: 14,
-                      background: "rgba(232,25,125,0.12)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0,
-                    }}>{s.img}</div>
-                    <div>
-                      <p style={{ fontWeight: 800, fontSize: 15 }}>{s.name}</p>
-                      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{s.desc}</p>
-                    </div>
-                  </div>
-                  <div className="divider" style={{ margin: "12px 0" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>⏱ {s.duration}</span>
-                    <span style={{ color: "var(--pink)", fontWeight: 800, fontSize: 18 }}>
-                      {s.priced ? `From ₱${servicePrice(s.id)}` : `₱${s.price}`}
-                    </span>
-                  </div>
-                  <button className="btn-pink wide" onClick={() => onBook()} style={{ marginTop: 16, borderRadius: 10 }}>
-                    Book This Service
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── CTA Banner ── */}
-        <section style={{
-          background: "linear-gradient(135deg, rgba(232,25,125,0.15) 0%, rgba(180,60,20,0.1) 100%)",
-          borderTop: "1px solid rgba(232,25,125,0.12)",
-          borderBottom: "1px solid rgba(232,25,125,0.12)",
-          padding: "22px 20px",
-          textAlign: "center",
-        }}>
-          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
-            Ready for Your Next Appointment?
-          </h2>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
-            Book in minutes and let our experts take care of the rest.
-          </p>
-          <button className="btn-pink" onClick={() => onBook()} style={{ padding: "10px 26px", fontSize: 13, borderRadius: 9 }}>
-            Book an Appointment
-          </button>
+        <section id="customer-about" className="landing-about">
+          <p className="landing-eyebrow">ABOUT ROSSEYGIRL SALON</p>
+          <h2>Your Beauty, Our Passion</h2>
+          <p>We provide quality beauty services in a comfortable, welcoming space. Our team is here to help you feel confident and cared for at every visit.</p>
+          <p><strong>Visit our salon in Poblacion, Oslob.</strong></p>
+          <button className="btn-outline" onClick={onAbout}>Learn More About Us</button>
         </section>
 
       </div>
+      <AboutFooter
+        onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onAbout={() => document.getElementById("customer-about")?.scrollIntoView({ behavior: "smooth" })}
+        onServices={() => onBook()}
+        onBook={() => onBook()}
+        onMyBookings={onMyBookings}
+      />
     </div>
   );
 }

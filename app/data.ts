@@ -82,11 +82,21 @@ export const KIDS_HAIRCUTS: HairType[] = [
 export const HAIR_COLOR_TYPES: HairType[] = [
   { name: "Full Hair Color",      time: "90 min", price: 1200 },
   { name: "Root Touch-Up",        time: "45 min", price: 650 },
+  { name: "Jet Black",            time: "75 min", price: 950 },
   { name: "Dark Brown",           time: "90 min", price: 1100 },
   { name: "Chocolate Brown",      time: "90 min", price: 1150 },
+  { name: "Light Brown",          time: "90 min", price: 1100 },
+  { name: "Honey Blonde",         time: "120 min", price: 1400 },
+  { name: "Ash Blonde",           time: "120 min", price: 1400 },
+  { name: "Platinum Blonde",      time: "150 min", price: 1700 },
   { name: "Ash Brown",            time: "90 min", price: 1150 },
   { name: "Burgundy",             time: "90 min", price: 1200 },
+  { name: "Mahogany",             time: "90 min", price: 1200 },
+  { name: "Wine Red",             time: "90 min", price: 1200 },
   { name: "Copper",               time: "90 min", price: 1200 },
+  { name: "Silver Grey",          time: "150 min", price: 1700 },
+  { name: "Mocha Brown",          time: "90 min", price: 1150 },
+  { name: "Chestnut Brown",       time: "90 min", price: 1150 },
   { name: "Black Hair Color",     time: "75 min", price: 950 },
   { name: "Fashion Colors",       time: "120 min", price: 1800 },
   { name: "Color Correction",     time: "150 min", price: 2500 },
@@ -170,16 +180,6 @@ export const WAXING_TYPES: HairType[] = [
   { name: "Chest & Back Wax",  time: "45 min", price: 800 },
 ];
 
-/* ── Packages ── */
-export const PACKAGE_TYPES: HairType[] = [
-  { name: "Hair & Blowout Package",    time: "90 min",  price: 600 },
-  { name: "Hair Cut + Color Package",  time: "150 min", price: 1400 },
-  { name: "Bride Package",             time: "240 min", price: 4500 },
-  { name: "Pamper Day Package",        time: "180 min", price: 2800 },
-  { name: "Nails & Toes Package",      time: "120 min", price: 850 },
-  { name: "Glow Up Package",           time: "150 min", price: 2000 },
-];
-
 export const CATEGORIES: Category[] = [
   {
     icon: "💇", label: "Hair", name: "Hair Services", desc: "Cuts, styling and treatments",
@@ -190,23 +190,13 @@ export const CATEGORIES: Category[] = [
         priced: true, typeLabel: "hair spa", columnsHeader: "Hair Spa", types: HAIR_SPA_TYPES },
       { id: 4, name: "Hair Color", desc: "Professional Hair Coloring", duration: "90 min", price: 1200, img: "🎨",
         priced: true, typeLabel: "hair color", columnsHeader: "Hair Color", types: HAIR_COLOR_TYPES },
-      { id: 6, name: "Blowout", desc: "Wash & blowdry styling", duration: "45 min", price: 320, img: "💨" },
     ],
   },
   {
-    icon: "💅", label: "Nails", name: "Nail Care", desc: "Manicure, pedicure and nail art",
+    icon: "💅", label: "Nails", name: "Nail Care", desc: "Manicure and nail art",
     services: [
       { id: 3, name: "Manicure", desc: "Nail care & polish", duration: "40 min", price: 290, img: "💅",
         priced: true, typeLabel: "manicure", columnsHeader: "Manicure", types: MANICURE_TYPES },
-      { id: 7, name: "Pedicure", desc: "Foot care & polish", duration: "45 min", price: 350, img: "🦶",
-        priced: true, typeLabel: "pedicure", columnsHeader: "Pedicure", types: PEDICURE_TYPES },
-    ],
-  },
-  {
-    icon: "🧖‍♀️", label: "Spa", name: "Spa & Massage", desc: "Relaxing body treatments",
-    services: [
-      { id: 8, name: "Full Body Massage", desc: "Relaxing full body massage", duration: "60 min", price: 800, img: "💆‍♀️",
-        priced: true, typeLabel: "massage", columnsHeader: "Massage", types: BODY_MASSAGE_TYPES },
     ],
   },
   {
@@ -232,19 +222,27 @@ export const CATEGORIES: Category[] = [
         priced: true, typeLabel: "waxing", columnsHeader: "Waxing", types: WAXING_TYPES },
     ],
   },
-  {
-    icon: "✨", label: "Packages", name: "Packages", desc: "Bundled services at a better price",
-    services: [
-      { id: 12, name: "Salon Package", desc: "Bundled services for a full makeover", duration: "180 min", price: 2800, img: "✨",
-        priced: true, typeLabel: "package", columnsHeader: "Package", types: PACKAGE_TYPES },
-    ],
-  },
 ];
 
 /* Flat list of every bookable service, with its category attached */
 export const SERVICES: (ServiceItem & { category: string })[] = CATEGORIES.flatMap(c =>
   c.services.map(s => ({ ...s, category: c.label }))
 );
+
+/* The home and public landing page show a compact preview.  Keep it derived
+   from the public catalog so every preview card is also available in the
+   complete "See All Services" list. */
+export const FEATURED_SERVICES = SERVICES.slice(0, 4);
+
+/* Services that are retired from the booking menu but are still listed in the
+   admin dashboard's Services page (so they can be deleted from Supabase). */
+export const ADMIN_ONLY_SERVICES: (ServiceItem & { category: string })[] = [
+  { id: 7, name: "Pedicure", desc: "Foot care & polish", duration: "45 min", price: 350, img: "🦶",
+    priced: true, typeLabel: "pedicure", columnsHeader: "Pedicure", types: PEDICURE_TYPES, category: "Nails" },
+];
+
+/* Move a retired service from ADMIN_ONLY_SERVICES into CATEGORIES to bring it
+   back to the customer-facing menu. */
 
 /* Look up a service by id */
 export function getService(id: number) {

@@ -2,7 +2,7 @@
 import SalonLogo from "./SalonLogo";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { CATEGORIES, HairType } from "../data";
+import { CATEGORIES, HairType, ServiceItem } from "../data";
 
 type DBService = { id: string; name: string; category: string; duration: string; price: number; img: string; };
 
@@ -12,10 +12,11 @@ type Props = { selected: number[]; onToggle: (id: number) => void; onNext: () =>
 
 /* A service whose price comes from the chosen type instead of a fixed price */
 type Priced = { priced?: boolean; types?: HairType[]; typeLabel?: string; columnsHeader?: string };
+type DisplayService = ServiceItem & { category?: string };
 
 /* Type list for one service — every type has its own price and "Book Now" button */
 function TypeList({ service, booked, onBook }: {
-  service: Priced & { name: string; img: string };
+  service: Priced & { id: number; name: string; img: string };
   booked: string | null;
   onBook: (h: HairType) => void;
 }) {
@@ -26,14 +27,15 @@ function TypeList({ service, booked, onBook }: {
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>{service.columnsHeader ?? "Type"}</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>Price</span>
       </div>
+      <div className="service-type-grid">
       {types.map(h => {
         const isBooked = booked === h.name;
         return (
-          <div key={h.name} style={{
+          <div key={h.name} className={`service-type-card ${isBooked ? "selected" : ""}`} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
             padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)",
           }}>
-            <span style={{ fontSize: 12, flex: 1, color: isBooked ? "var(--gold)" : "var(--text-light)", fontWeight: isBooked ? 700 : 400 }}>
+            <span className="service-type-name" style={{ fontSize: 12, flex: 1, color: isBooked ? "var(--gold)" : "var(--text-light)", fontWeight: isBooked ? 700 : 400 }}>
               {h.name}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -52,40 +54,42 @@ function TypeList({ service, booked, onBook }: {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
 
 export default function SelectService({ selected, onToggle, onNext, onBack, chosen, onChoose, initialCategory }: Props) {
-  const [activeCat, setActiveCat] = useState<string>(initialCategory || CATEGORIES[0].label);
+  const [activeCat, setActiveCat] = useState<string>(() =>
+    initialCategory && CATEGORIES.some(c => c.label === initialCategory) ? initialCategory : CATEGORIES[0].label,
+  );
   const [openSvc, setOpenSvc] = useState<number | null>(null);
   const [dbServices, setDbServices] = useState<DBService[]>([]);
 
   useEffect(() => {
-    supabase.from("services").select("*").order("created_at", { ascending: true })
+    supabase.from("services").select("*").neq("name", "Full Body Massage").neq("name", "Blowout").order("created_at", { ascending: true })
       .then(({ data }) => { if (data) setDbServices(data); });
   }, []);
+
+  // Arriving from a service card / "Book Now" resets which category is shown
+  useEffect(() => {
+    if (initialCategory && CATEGORIES.some(c => c.label === initialCategory)) {
+      setActiveCat(initialCategory);
+      setOpenSvc(null);
+    }
+  }, [initialCategory]);
 
   // Build categories from DB services, falling back to static CATEGORIES structure for types/priced info
   const category = CATEGORIES.find(c => c.label === activeCat) ?? CATEGORIES[0];
 
-  // Merge DB services into the category: use DB price/name/img but keep static type info
-  const mergedServices = category.services.map(staticSvc => {
-    const dbMatch = dbServices.find(d => d.name.toLowerCase() === staticSvc.name.toLowerCase() && d.category === activeCat);
-    return dbMatch ? { ...staticSvc, price: dbMatch.price, duration: dbMatch.duration, img: dbMatch.img } : staticSvc;
-  });
-
-  // Also include any DB-only services in this category not in static list
-  const staticNames = category.services.map(s => s.name.toLowerCase());
-  const extraDbServices = dbServices
-    .filter(d => d.category === activeCat && !staticNames.includes(d.name.toLowerCase()))
-    .map((d, i) => ({
-      id: 1000 + i,
-      name: d.name, desc: d.name, duration: d.duration,
-      price: d.price, img: d.img, category: d.category,
-    }));
-
-  const allServices = [...mergedServices, ...extraDbServices];
+  const allServices: DisplayService[] = dbServices
+    .filter(service => service.category === activeCat)
+    .map((service, index) => {
+      const staticService = category.services.find(item => item.name.toLowerCase() === service.name.toLowerCase());
+      return staticService
+        ? { ...staticService, price: service.price, duration: service.duration, img: service.img }
+        : { id: 1000 + index, name: service.name, desc: service.name, duration: service.duration, price: service.price, img: service.img, category: service.category };
+    });
 
   /* Price of a service: the chosen type's price for priced services, else its fixed price */
   const priceOf = (s: { id: number; price: number } & Priced) =>
@@ -174,13 +178,13 @@ export default function SelectService({ selected, onToggle, onNext, onBack, chos
                 <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>{category.desc}</p>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="service-items-grid">
                 {allServices.map(s => {
                   const isOpen = openSvc === s.id;
                   const choice = chosen[s.id];
                   const isSelected = selected.includes(s.id);
                   return (
-                    <div key={s.id} style={{
+                    <div key={s.id} className={`service-item-card ${isOpen ? "is-open" : ""}`} style={{
                       border: `1px solid ${isSelected ? "var(--pink)" : "rgba(255,255,255,0.07)"}`,
                       borderRadius: 14, overflow: "hidden",
                       background: isSelected ? "rgba(232,25,125,0.05)" : "rgba(255,255,255,0.015)",

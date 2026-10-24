@@ -14,6 +14,14 @@ create table if not exists public.stylists (
   created_at timestamptz not null default now()
 );
 
+alter table public.stylists
+  add column if not exists rating_count integer not null default 0,
+  add column if not exists img text not null default '👩',
+  add column if not exists email text,
+  add column if not exists user_id uuid references auth.users (id) on delete set null,
+  add column if not exists photo_url text,
+  add column if not exists created_at timestamptz not null default now();
+
 create or replace function public.is_salon_admin()
 returns boolean
 language sql
@@ -46,5 +54,20 @@ create policy "Salon admins can manage stylists"
   on public.stylists for all to authenticated
   using ((select public.is_salon_admin()))
   with check ((select public.is_salon_admin()));
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1
+       from pg_publication_tables
+       where pubname = 'supabase_realtime'
+         and schemaname = 'public'
+         and tablename = 'stylists'
+     ) then
+    alter publication supabase_realtime add table public.stylists;
+  end if;
+end;
+$$;
 
 notify pgrst, 'reload schema';

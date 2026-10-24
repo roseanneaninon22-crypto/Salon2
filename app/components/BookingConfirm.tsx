@@ -72,6 +72,7 @@ export default function BookingConfirm({ serviceIds, stylistId, stylistName, dat
                 ["Time",      time],
                 ["Customer",  customerName],
                 ["Phone",     customerPhone],
+                ["Payment",   "Cash only - pay at the salon"],
               ].map(([label, value]) => (
                 <div key={label} style={{ padding: "12px 0", borderBottom: "1px solid rgba(201,168,76,0.08)" }}>
                   <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{label}</p>
