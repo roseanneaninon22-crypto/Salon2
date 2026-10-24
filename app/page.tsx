@@ -166,7 +166,20 @@ export default function App() {
     <>
       {screen === "landing" && <LandingPage onLogin={handleLogin} onSeeAllServices={() => openAllServices("landing")} onOpenService={serviceId => openServiceDetails(serviceId, "landing")} />}
       {screen === "all-services" && <AllServicesPage onBack={() => setScreen(detailReturnScreen === "home" ? "home" : "landing")} onOpenService={serviceId => openServiceDetails(serviceId, "all-services")} />}
-      {screen === "service-details" && <ServiceDetailsPage serviceId={detailServiceId} onBack={() => setScreen(detailReturnScreen)} onLogin={handleLogin} onBook={detailReturnScreen === "home" ? (book, typeName) => bookService(book, typeName) : undefined} />}
+      
+{screen === "service-details" && (
+  <ServiceDetailsPage
+    serviceId={detailServiceId}
+    onBack={() => setScreen(detailReturnScreen)}
+    onLogin={handleLogin}
+    onBook={
+      detailReturnScreen === "home"
+        ? (serviceId) => bookService(serviceId)
+        : undefined
+    }
+  />
+)}
+
       {screen === "auth" && <AuthScreen onLogin={handleLogin} />}
       {screen === "home" && <HomeScreen onBook={handleBook} onMyBookings={() => setScreen("my-bookings")} onMessages={() => setScreen("messages")} onAbout={() => setScreen("about")} onLogout={handleLogout} onSeeAllServices={() => openAllServices("home")} onOpenService={serviceId => openServiceDetails(serviceId, "home")} userName={userName} />}
       {screen === "about" && <AboutScreen onHome={() => setScreen("home")} onBook={() => handleBook()} onMyBookings={() => setScreen("my-bookings")} onLogout={handleLogout} userName={userName} />}
@@ -175,7 +188,20 @@ export default function App() {
       {screen === "choose-stylist" && <ChooseStylist selected={selectedStylist} onSelect={(id, name) => { setSelectedStylist(id); setSelectedStylistName(name); }} onNext={() => setScreen("reservation")} onBack={() => setScreen("select-datetime")} />}
       {screen === "reservation" && <ReservationForm serviceIds={selectedServices} stylistId={selectedStylist} stylistName={selectedStylistName} date={selectedDate} time={selectedTime} chosen={chosen} onConfirm={handleConfirm} onBack={() => setScreen("choose-stylist")} />}
       {screen === "confirm" && <BookingConfirm serviceIds={selectedServices} stylistId={selectedStylist} stylistName={selectedStylistName} date={selectedDate} time={selectedTime} chosen={chosen} customerName={customerName} customerPhone={customerPhone} customerNotes={customerNotes} onDone={() => setScreen("my-bookings")} onNewBooking={resetBooking} />}
-      {screen === "my-bookings" && <MyBookings onBack={() => setScreen("home")} onBook={() => setScreen("select-service")} />}
+
+{screen === "service-details" && (
+  <ServiceDetailsPage
+    serviceId={detailServiceId}
+    onBack={() => setScreen(detailReturnScreen)}
+    onLogin={handleLogin}
+   onBook={
+  detailReturnScreen === "home"
+    ? (serviceId) => bookService(serviceId)
+    : undefined
+}
+  />
+)}
+
       {screen === "messages" && <MessageCenter onBack={() => setScreen("home")} />}
       {screen === "admin" && <AdminDashboard onLogout={handleLogout} />}
       {screen === "stylist" && <StylistDashboard onLogout={handleLogout} userName={userName} />}
