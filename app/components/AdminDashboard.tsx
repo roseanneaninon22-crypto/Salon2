@@ -55,7 +55,7 @@ const MENU = [
     { icon: "📋", label: "Reports" },
   ] },
   { group: "Messages", items: [
-    { icon: "Message", label: "Messages" },
+    { icon: "💬", label: "Messages" },
   ] },
   { group: "Services & Catalog", items: [
     { icon: "✂️", label: "Services" },
@@ -92,6 +92,9 @@ export default function AdminDashboard({ onLogout }: Props) {
   const [bookingError, setBookingError] = useState("");
   const [savingBookingId, setSavingBookingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [supabaseItems, setSupabaseItems] = useState<{ id: string; category: string; service: string; name: string; duration: string; price: number }[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [itemsError, setItemsError] = useState("");
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -103,6 +106,18 @@ export default function AdminDashboard({ onLogout }: Props) {
       // here, even if it is not offered on the public booking screen.
       supabase.from("services").select("*").order("created_at", { ascending: true }),
     ]);
+
+    // Load service items from Supabase
+    setItemsLoading(true);
+    const { data: siData, error: siErr } = await supabase
+      .from("service_items")
+      .select("id, category, service, name, duration, price")
+      .order("category")
+      .order("service")
+      .order("price");
+    setSupabaseItems((siData ?? []) as { id: string; category: string; service: string; name: string; duration: string; price: number }[]);
+    setItemsError(siErr ? siErr.message : "");
+    setItemsLoading(false);
     if (bErr) {
       console.error("bookings error:", bErr);
       setBookingError(`Could not load appointments: ${bErr.message}`);
@@ -1065,71 +1080,91 @@ export default function AdminDashboard({ onLogout }: Props) {
             );
           })()}
 
-          {/* ── SERVICE ITEMS (flat list) ── */}
+          {/* ── SERVICE ITEMS (from Supabase) ── */}
           {active === "Service Items" && (() => {
-            /* The landing page opens a parent service card (e.g. Hair Cut), then
-               shows its selectable options. This register mirrors those actual
-               options so every landing-page service item is visible to admins. */
-            const itemCat = allSvcCategories.find(c => c.label === itemCategory) ?? null;
-            const itemCategories = itemCat ? [itemCat] : allSvcCategories;
-            const itemList = itemCategories.flatMap(cat => cat.allServices.flatMap(svc => {
-              const source = svc as {
-                id: number;
-                name: string;
-                desc: string;
-                duration: string;
-                price: number;
-                img: string;
-                dbId?: string;
-                types?: { name: string; time: string; price: number }[];
-              };
-              const base = { category: cat.label, serviceName: source.name, img: source.img, dbId: source.dbId };
-              return source.types?.length
-                ? source.types.map(option => ({ ...base, id: `${source.id}-${option.name}`, name: option.name, desc: `Option under ${source.name}`, duration: option.time, price: option.price, image: getServiceOptionImage(source.id, option.name), isOption: true }))
-                : [{ ...base, id: String(source.id), name: source.name, desc: source.desc, duration: source.duration, price: source.price, image: undefined, isOption: false }];
-            }));
+            const categories = [...new Set(supabaseItems.map(i => i.category))].sort();
+            const filtered = itemCategory
+              ? supabaseItems.filter(i => i.category === itemCategory)
+              : supabaseItems;
+
             return (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <div>
-                  <p style={{ fontWeight: 700, fontSize: 15, color: "var(--gold)" }}>Service Items ({itemList.length})</p>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>
-                    {itemCat ? `Showing the landing-page service options under ${itemCat.name}.` : "Showing every service option from the landing page."}
+              <div>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 15, color: "var(--gold)" }}>
+                      Service Items ({filtered.length}{itemCategory ? "" : ` total`})
+                    </p>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>
+                      Live from Supabase · Run <code>service_items_seed.sql</code> to populate
+                    </p>
+                  </div>
+                  <select
+                    className="inp"
+                    aria-label="Filter by category"
+                    value={itemCategory ?? ""}
+                    onChange={e => setItemCategory(e.target.value || null)}
+                    style={{ width: "auto", minWidth: 180 }}
+                  >
+                    <option value="">All categories</option>
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+
+                {/* Error / loading states */}
+                {itemsError && (
+                  <p role="alert" style={{ color: "#f44336", fontSize: 13, marginBottom: 12 }}>
+                    {itemsError.includes("service_items") || itemsError.includes("does not exist")
+                      ? "The service_items table doesn't exist yet. Run supabase/service_items.sql then supabase/service_items_seed.sql in the Supabase SQL Editor."
+                      : itemsError}
                   </p>
-                </div>
-                <select className="inp admin-service-items-filter" aria-label="Filter service items by category" value={itemCategory ?? ""} onChange={e => setItemCategory(e.target.value || null)} style={{ width: "auto", minWidth: 180 }}>
-                  <option value="">All categories</option>
-                  {allSvcCategories.map(cat => <option key={cat.label} value={cat.label}>{cat.icon} {cat.name}</option>)}
-                </select>
-              </div>
+                )}
+                {itemsLoading && <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, marginBottom: 12 }}>Loading…</p>}
 
-              {serviceError && <p role="alert" style={{ color: "#f44336", fontSize: 13, marginBottom: 12 }}>{serviceError}</p>}
-
-              <div className="stat-card" style={{ padding: 20 }}>
-                <div className="admin-svc-list">
-                  {itemList.length === 0 && <p className="admin-svc-empty">No service items to show.</p>}
-                  {itemList.map((svc, i) => (
-                      <div key={svc.id + "-" + i} className="admin-svc-row">
-                       {svc.image ? <img className="admin-svc-image" src={svc.image} alt="" /> : <span className="admin-svc-emoji">{svc.img}</span>}
-                      <div className="admin-svc-main">
-                        <p className="admin-svc-name">{svc.name}</p>
-                        {svc.desc && <p className="admin-svc-desc">{svc.desc}</p>}
-                        {(svc as any).types && (svc as any).types.length > 0 && (
-                          <p className="admin-svc-types">{(svc as any).types.length} sub-types: {(svc as any).types.slice(0, 4).map((t: { name: string }) => t.name).join(", ")}{(svc as any).types.length > 4 ? "…" : ""}</p>
-                        )}
+                {/* Table */}
+                {!itemsLoading && !itemsError && (
+                  <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
+                    {filtered.length === 0 ? (
+                      <p style={{ padding: 30, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+                        No items found. Run <code>service_items_seed.sql</code> to seed the table.
+                      </p>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                              <th style={{ padding: "10px 16px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 700, whiteSpace: "nowrap" }}>Category</th>
+                              <th style={{ padding: "10px 16px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 700, whiteSpace: "nowrap" }}>Service</th>
+                              <th style={{ padding: "10px 16px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>Item Name</th>
+                              <th style={{ padding: "10px 16px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 700, whiteSpace: "nowrap" }}>Duration</th>
+                              <th style={{ padding: "10px 16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontWeight: 700, whiteSpace: "nowrap" }}>Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filtered.map((item, idx) => (
+                              <tr
+                                key={item.id}
+                                style={{
+                                  borderBottom: idx < filtered.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                                  background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+                                }}
+                              >
+                                <td style={{ padding: "10px 16px", color: "var(--pink)", fontWeight: 600 }}>{item.category}</td>
+                                <td style={{ padding: "10px 16px", color: "rgba(255,255,255,0.65)" }}>{item.service}</td>
+                                <td style={{ padding: "10px 16px", color: "#fff", fontWeight: 500 }}>{item.name}</td>
+                                <td style={{ padding: "10px 16px", color: "rgba(255,255,255,0.55)" }}>{item.duration}</td>
+                                <td style={{ padding: "10px 16px", textAlign: "right", color: "var(--gold)", fontWeight: 700 }}>
+                                  ₱{Number(item.price).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                      <span className="admin-svc-cat">{svc.category}</span>
-                      <span className="admin-svc-duration">{svc.duration}</span>
-                      <span className="admin-svc-price">₱{Number(svc.price || 0).toLocaleString()}</span>
-                      <button onClick={() => { if (!svc.isOption && svc.dbId) deleteService(svc.dbId); }}
-                        aria-label={`Delete ${svc.name}`}
-                        className="admin-svc-delete">🗑️</button>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-            </div>
             );
           })()}
 
