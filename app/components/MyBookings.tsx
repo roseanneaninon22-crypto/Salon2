@@ -36,6 +36,7 @@ export default function MyBookings({ onBack, onBook }: Props) {
   const [reviewText, setReviewText] = useState("");
   const [ratingError, setRatingError] = useState("");
   const [ratingLoading, setRatingLoading] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
   useEffect(() => {
     let disposed = false;
@@ -104,12 +105,17 @@ export default function MyBookings({ onBack, onBook }: Props) {
       if (disposed) return;
       subscribeToBookings(user.id);
 
-      const { data } = await supabase
+      const { data, error: fetchError } = await supabase
         .from("bookings")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (disposed) return;
+
+      if (fetchError) {
+        console.error("Failed to load bookings:", fetchError.message);
+        setFetchError(fetchError.message);
+      }
 
       const latest = new Map((data ?? []).map(b => [b.id, b]));
       for (const [id, b] of realtimeChanges) {
@@ -243,6 +249,12 @@ export default function MyBookings({ onBack, onBook }: Props) {
           ))}
         </div>
 
+        {fetchError && (
+          <div style={{ background: "rgba(244,67,54,0.1)", border: "1px solid rgba(244,67,54,0.3)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+            <p style={{ color: "#ff6b6b", fontSize: 13, fontWeight: 700, margin: 0 }}>Could not load bookings</p>
+            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, margin: "6px 0 0" }}>{fetchError}</p>
+          </div>
+        )}
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>Loading bookings...</div>
         ) : filtered.length === 0 ? (
