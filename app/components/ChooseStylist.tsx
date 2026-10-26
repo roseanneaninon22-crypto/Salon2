@@ -120,30 +120,19 @@ export default function ChooseStylist({ selected, onSelect, onNext, onBack }: Pr
           ))}
         </div>
 
-        {/* Any stylist option */}
-        <div
-          className={`card card-hover ${selected === "any" ? "sel" : ""}`}
-          style={{
-            padding: "20px 28px", display: "flex", alignItems: "center", gap: 16,
-            cursor: "pointer", marginBottom: 32,
-            border: selected === "any" ? "1.5px solid var(--pink)" : "1.5px dashed rgba(201,168,76,0.3)",
-          }}
-          onClick={() => onSelect("any", "Any available stylist")}>
-          <span style={{ fontSize: 32 }}>🎲</span>
-          <div>
-            <p style={{ fontWeight: 700, fontSize: 15 }}>No preference — Any available stylist</p>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>We'll assign the best available stylist for your appointment</p>
-          </div>
-          {selected === "any" && <span style={{ marginLeft: "auto", color: "var(--pink)", fontWeight: 700 }}>✓ Selected</span>}
-        </div>
-
         {/* Actions */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <button className="btn-ghost" onClick={onBack}>‹ Back</button>
-          <button className="btn-pink" onClick={onNext} disabled={selected === null}
-            style={{ padding: "13px 40px", borderRadius: 10, fontSize: 15 }}>
-            Continue to Your Details
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button className="btn-ghost" onClick={() => { onSelect("any", "Any available stylist"); onNext(); }}
+              style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              Skip — any stylist
+            </button>
+            <button className="btn-pink" onClick={onNext} disabled={selected === null}
+              style={{ padding: "13px 40px", borderRadius: 10, fontSize: 15 }}>
+              Continue to Your Details
+            </button>
+          </div>
         </div>
       </div>
     </div>
