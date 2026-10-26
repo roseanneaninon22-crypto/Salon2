@@ -58,11 +58,16 @@ export default function SelectService({ selected, onToggle, onNext, onBack, chos
   const [openSvc, setOpenSvc] = useState<number | null>(null);
   const [dbServices, setDbServices] = useState<DBService[]>([]);
 
+  const HIDDEN_SERVICES = ["full body massage", "blowout", "blow out"];
+
   useEffect(() => {
     supabase.from("services").select("*")
-      .neq("name", "Full Body Massage").neq("name", "Blowout")
       .order("created_at", { ascending: true })
-      .then(({ data }) => { if (data) setDbServices(data); });
+      .then(({ data }) => {
+        if (data) setDbServices(
+          data.filter(s => !HIDDEN_SERVICES.includes(s.name.toLowerCase().trim()))
+        );
+      });
   }, []);
 
   useEffect(() => {

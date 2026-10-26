@@ -21,14 +21,15 @@ export default function AllServicesPage({ onBack, onOpenService }: Props) {
       const { data, error } = await supabase
         .from("services")
         .select("id, name, category, duration, price, img")
-        .neq("name", "Full Body Massage")
-        .neq("name", "Blowout")
-        .neq("category", "Packages")
         .order("created_at", { ascending: true });
 
       if (error || !data?.length || !active) return;
 
-      const services = (data as DBService[]).map(item => {
+      const HIDDEN = ["full body massage", "blowout", "blow out"];
+
+      const services = (data as DBService[])
+        .filter(item => !HIDDEN.includes(item.name.toLowerCase().trim()) && item.category !== "Packages")
+        .map(item => {
         const savedService = SERVICES.find(service =>
           service.name.toLowerCase() === item.name.toLowerCase() && service.category === item.category,
         );

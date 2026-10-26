@@ -173,7 +173,7 @@ export default function App() {
     onBack={() => setScreen(detailReturnScreen)}
     onLogin={handleLogin}
     onBook={
-      detailReturnScreen === "home"
+      detailReturnScreen !== "landing"
         ? (serviceId) => bookService(serviceId)
         : undefined
     }
