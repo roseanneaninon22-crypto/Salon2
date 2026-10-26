@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 
 type Booking = {
   id: string;
-  user_id?: string;
+  user_id?: string | null;
   services: string;
   stylist: string;
   date: string;
@@ -26,126 +26,96 @@ type Booking = {
 type Props = { onBack: () => void; onBook: () => void };
 const TABS = ["Upcoming", "Completed", "Cancelled"];
 
-export default function MyBookings({ onBack, onBook }: Props) {
-  const [tab, setTab] = useState(0);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
-  const [serviceStars, setServiceStars] = useState(0);
-  const [stylistStars, setStylistStars] = useState(0);
-  const [reviewText, setReviewText] = useState("");
-  const [ratingError, setRatingError] = useState("");
-  const [ratingLoading, setRatingLoading] = useState(false);
-  const [fetchError, setFetchError] = useState("");
+const statusColor: Record<string, string> = {
+  pending:   "#ffc107",
+  confirmed: "#4caf50",
+  completed: "#2196f3",
+  cancelled: "#f44336",
+};
 
+export default function MyBookings({ onBack, onBook }: Props) {
+  const [tab, setTab]           = useState(0);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [fetchError, setFetchError] = useState("");
+  const [viewBooking, setViewBooking] = useState<Booking | null>(null);
+
+  const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
+  const [serviceStars, setServiceStars]   = useState(0);
+  const [stylistStars, setStylistStars]   = useState(0);
+  const [reviewText,   setReviewText]     = useState("");
+  const [ratingError,  setRatingError]    = useState("");
+  const [ratingLoading, setRatingLoading] = useState(false);
+
+  /* ── data loading ── */
   useEffect(() => {
     let disposed = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
     let refreshTimer: ReturnType<typeof setInterval> | null = null;
-    const realtimeChanges = new Map<string, Booking | null>();
-    let reconnecting = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    const subscribeToBookings = (userId: string) => {
-      channel = supabase
-        .channel(`bookings-for-${userId}-${crypto.randomUUID()}`)
-        .on("postgres_changes", {
-          event: "*",
-          schema: "public",
-          table: "bookings",
-          filter: `user_id=eq.${userId}`,
-        }, payload => {
-          if (payload.eventType === "DELETE") {
-            const removed = payload.old as Partial<Booking>;
-            if (!removed.id) return;
-            realtimeChanges.set(removed.id, null);
-            setBookings(current => current.filter(b => b.id !== removed.id));
-            return;
-          }
-          const changed = payload.new as Booking;
-          if (!changed.id) return;
-          realtimeChanges.set(changed.id, changed);
-          setBookings(current =>
-            current.some(b => b.id === changed.id)
-              ? current.map(b => b.id === changed.id ? { ...b, ...changed } : b)
-              : [changed, ...current]
-          );
-        })
-        .subscribe((status, error) => {
-          if (disposed) return;
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            const message = error?.message ?? "Realtime connection failed";
-            if (/InvalidJWTToken|token has expired/i.test(message) && !reconnecting) {
-              reconnecting = true;
-              void supabase.auth.refreshSession().then(async ({ data, error: refreshError }) => {
-                if (disposed) return;
-                if (refreshError || !data.session) return;
-                await supabase.realtime.setAuth(data.session.access_token);
-                if (disposed) return;
-                const old = channel;
-                channel = null;
-                if (old) await supabase.removeChannel(old);
-                if (!disposed) subscribeToBookings(userId);
-              }).finally(() => { reconnecting = false; });
-            }
-          }
-        });
-    };
-
-    const load = async () => {
+    const doLoad = async () => {
       setLoading(true);
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
-      if (disposed) return;
-      const user = session?.user;
-      if (!user) {
-        if (sessionError) console.error("Session error:", sessionError.message);
-        setLoading(false);
-        return;
-      }
-      await supabase.realtime.setAuth(session.access_token);
-      if (disposed) return;
-      subscribeToBookings(user.id);
+      setFetchError("");
 
-      // Get user's phone from profile for fallback matching
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (disposed) return;
+      if (!session?.user) { setLoading(false); return; }
+
+      const user = session.user;
+
+      /* phone fallback so bookings with null user_id still show */
       const { data: profile } = await supabase
-        .from("users")
-        .select("phone")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      const userPhone = profile?.phone ?? "";
+        .from("users").select("phone").eq("user_id", user.id).maybeSingle();
+      const phone = profile?.phone ?? "";
 
-      const { data, error: fetchError } = await supabase
+      const orFilter = phone
+        ? `user_id.eq.${user.id},customer_phone.eq.${phone}`
+        : `user_id.eq.${user.id}`;
+
+      const { data, error } = await supabase
         .from("bookings")
-        .select("*")
-        .or(`user_id.eq.${user.id}${userPhone ? `,customer_phone.eq.${userPhone}` : ""}`)
+        .select("id,user_id,services,stylist,date,time,status,total,notes,customer_name,customer_phone,payment_method,rated,service_rating,stylist_rating,review_text,created_at")
+        .or(orFilter)
         .order("created_at", { ascending: false });
+
       if (disposed) return;
-
-      if (fetchError) {
-        console.error("Failed to load bookings:", fetchError.message);
-        setFetchError(fetchError.message);
-      }
-
-      const latest = new Map((data ?? []).map(b => [b.id, b]));
-      for (const [id, b] of realtimeChanges) {
-        if (b) latest.set(id, b);
-        else latest.delete(id);
-      }
-      setBookings([...latest.values()]);
+      if (error) { setFetchError(error.message); setLoading(false); return; }
+      setBookings((data ?? []) as Booking[]);
       setLoading(false);
 
-      refreshTimer = setInterval(() => {
-        void supabase
+      /* realtime — updates status without full reload */
+      channel = supabase
+        .channel(`my-bookings-${user.id}-${Date.now()}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, payload => {
+          if (disposed) return;
+          if (payload.eventType === "DELETE") {
+            setBookings(prev => prev.filter(b => b.id !== (payload.old as Booking).id));
+            return;
+          }
+          const updated = payload.new as Booking;
+          setBookings(prev =>
+            prev.some(b => b.id === updated.id)
+              ? prev.map(b => b.id === updated.id ? { ...b, ...updated } : b)
+              : [updated, ...prev]
+          );
+          /* keep the detail modal in sync */
+          setViewBooking(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+        })
+        .subscribe();
+
+      /* polling fallback every 8 s */
+      refreshTimer = setInterval(async () => {
+        if (disposed) return;
+        const { data: fresh } = await supabase
           .from("bookings")
-          .select("*")
-          .or(`user_id.eq.${user.id}${userPhone ? `,customer_phone.eq.${userPhone}` : ""}`)
-          .order("created_at", { ascending: false })
-          .then(({ data: fresh }) => {
-            if (!disposed && fresh) setBookings(fresh);
-          });
-      }, 5000);
+          .select("id,user_id,services,stylist,date,time,status,total,notes,customer_name,customer_phone,payment_method,rated,service_rating,stylist_rating,review_text,created_at")
+          .or(orFilter)
+          .order("created_at", { ascending: false });
+        if (!disposed && fresh) setBookings(fresh as Booking[]);
+      }, 8000);
     };
 
-    void load();
+    void doLoad();
     return () => {
       disposed = true;
       if (refreshTimer) clearInterval(refreshTimer);
@@ -160,47 +130,128 @@ export default function MyBookings({ onBack, onBook }: Props) {
   });
 
   const cancel = async (id: string) => {
-    const booking = bookings.find(b => b.id === id);
-    if (!booking || booking.status !== "pending") return;
+    const b = bookings.find(x => x.id === id);
+    if (!b || b.status !== "pending") return;
     const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id);
     if (error) { window.alert(`Could not cancel: ${error.message}`); return; }
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: "cancelled" } : b));
   };
 
   const submitRating = async () => {
-    if (!ratingBooking) return;
-    if (!serviceStars || !stylistStars || !reviewText.trim()) {
-      setRatingError("Please rate the service and stylist, then write a review.");
-      return;
+    if (!ratingBooking || !serviceStars || !stylistStars || !reviewText.trim()) {
+      setRatingError("Please rate the service and stylist, then write a review."); return;
     }
-    setRatingLoading(true);
-    setRatingError("");
-    const review = reviewText.trim();
+    setRatingLoading(true); setRatingError("");
     const { data, error } = await supabase.from("bookings")
-      .update({ service_rating: serviceStars, stylist_rating: stylistStars, review_text: review, rated: true })
+      .update({ service_rating: serviceStars, stylist_rating: stylistStars, review_text: reviewText.trim(), rated: true })
       .eq("id", ratingBooking.id).eq("status", "completed").eq("rated", false)
       .select("id").maybeSingle();
-    if (error || !data) {
-      setRatingError(error?.message ?? "Already rated or not available.");
-      setRatingLoading(false);
-      return;
-    }
-    setBookings(prev => prev.map(b =>
-      b.id === ratingBooking.id
-        ? { ...b, rated: true, service_rating: serviceStars, stylist_rating: stylistStars, review_text: review }
-        : b
-    ));
-    setRatingBooking(null);
-    setRatingLoading(false);
+    if (error || !data) { setRatingError(error?.message ?? "Already rated."); setRatingLoading(false); return; }
+    setBookings(prev => prev.map(b => b.id === ratingBooking.id
+      ? { ...b, rated: true, service_rating: serviceStars, stylist_rating: stylistStars, review_text: reviewText.trim() } : b));
+    setRatingBooking(null); setRatingLoading(false);
   };
+
+  /* ── detail modal ── */
+  const DetailModal = ({ b }: { b: Booking }) => (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }}>
+      <div style={{ background: "#1a1a1a", border: b.status === "confirmed" ? "1.5px solid #4caf50" : "1px solid rgba(255,255,255,0.12)", borderRadius: 18, width: "min(520px, 100%)", maxHeight: "90vh", overflowY: "auto" }}>
+
+        {/* Confirmed banner */}
+        {b.status === "confirmed" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(76,175,80,0.15)", borderBottom: "1px solid rgba(76,175,80,0.3)", padding: "12px 20px", borderRadius: "16px 16px 0 0" }}>
+            <span style={{ fontSize: 24 }}>✅</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: "#4caf50" }}>Appointment Confirmed!</p>
+              <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>The salon has approved your booking.</p>
+            </div>
+          </div>
+        )}
+
+        <div style={{ padding: 24 }}>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div>
+              <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>{b.services}</p>
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>💇 {b.stylist}</p>
+            </div>
+            <span style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, background: `${statusColor[b.status] ?? "#888"}22`, color: statusColor[b.status] ?? "#888", textTransform: "capitalize", flexShrink: 0 }}>
+              {b.status}
+            </span>
+          </div>
+
+          {/* Details grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px", background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            {[
+              ["📅 Date",    b.date],
+              ["🕐 Time",    b.time],
+              ["👤 Name",    b.customer_name],
+              ["📞 Phone",   b.customer_phone],
+              ["💳 Payment", b.payment_method ?? "Cash"],
+              ["💰 Total",   `₱${Number(b.total).toLocaleString()}`],
+            ].filter(([, v]) => v).map(([label, value]) => (
+              <div key={String(label)}>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>{String(label).replace(/.*\s/, "").toUpperCase()}</p>
+                <p style={{ fontWeight: 600, fontSize: 14, color: String(label).includes("Total") ? "var(--pink)" : "#fff" }}>{String(value)}</p>
+              </div>
+            ))}
+            {b.notes && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>NOTES</p>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>📝 {b.notes}</p>
+              </div>
+            )}
+            {b.created_at && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>BOOKED ON</p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.38)" }}>{new Date(b.created_at).toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Rating section */}
+          {b.status === "completed" && b.rated && (
+            <div style={{ background: "rgba(255,193,7,0.08)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+              <p style={{ fontWeight: 700, color: "#ffc107", marginBottom: 6 }}>Your Review</p>
+              <p style={{ color: "#ffc107", fontSize: 13 }}>
+                Service {"★".repeat(Math.min(5, b.service_rating ?? 0))} {b.service_rating}/5 ·
+                Stylist {"★".repeat(Math.min(5, b.stylist_rating ?? 0))} {b.stylist_rating}/5
+              </p>
+              {b.review_text && <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, fontStyle: "italic", marginTop: 6 }}>"{b.review_text}"</p>}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button className="btn-outline" style={{ fontSize: 13, flex: 1 }} onClick={() => setViewBooking(null)}>Close</button>
+            {b.status === "pending" && (
+              <button className="btn-outline" style={{ fontSize: 13, flex: 1, borderColor: "#f44336", color: "#f44336" }}
+                onClick={() => { cancel(b.id); setViewBooking(null); }}>
+                Cancel Booking
+              </button>
+            )}
+            {b.status === "completed" && !b.rated && (
+              <button className="btn-pink" style={{ fontSize: 13, flex: 1 }}
+                onClick={() => { setServiceStars(0); setStylistStars(0); setReviewText(""); setRatingError(""); setRatingBooking(b); setViewBooking(null); }}>
+                ★ Rate & Review
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">
 
-      {/* ── Rating Modal ── */}
+      {/* View Booking Modal */}
+      {viewBooking && <DetailModal b={viewBooking} />}
+
+      {/* Rating Modal */}
       {ratingBooking && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-          <div style={{ background: "#1a1a1a", border: "1px solid rgba(232,25,125,0.3)", borderRadius: 16, padding: 28, width: "min(440px, calc(100vw - 32px))", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }}>
+          <div style={{ background: "#1a1a1a", border: "1px solid rgba(232,25,125,0.3)", borderRadius: 16, padding: 28, width: "min(440px, 100%)", maxHeight: "90vh", overflowY: "auto" }}>
             <p style={{ fontWeight: 700, fontSize: 18, color: "var(--gold)", marginBottom: 6, textAlign: "center" }}>Rate Your Experience</p>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 20, textAlign: "center" }}>{ratingBooking.services} · {ratingBooking.stylist}</p>
             {([
@@ -211,19 +262,17 @@ export default function MyBookings({ onBack, onBook }: Props) {
                 <legend style={{ color: "#fff", fontSize: 13, marginBottom: 6 }}>{g.label}</legend>
                 <div style={{ display: "flex", gap: 8 }}>
                   {[1,2,3,4,5].map(n => (
-                    <button key={n} type="button" aria-label={`${n} stars`} aria-pressed={g.value === n}
-                      onClick={() => g.set(n)}
+                    <button key={n} type="button" onClick={() => g.set(n)}
                       style={{ border: 0, background: "transparent", fontSize: 30, cursor: "pointer", color: n <= g.value ? "#ffc107" : "rgba(255,255,255,.25)" }}>★</button>
                   ))}
                 </div>
               </fieldset>
             ))}
-            <label htmlFor="booking-review" style={{ display: "block", color: "#fff", fontSize: 13, marginBottom: 8 }}>Your review</label>
-            <textarea id="booking-review" value={reviewText} maxLength={1000}
-              onChange={e => setReviewText(e.target.value)}
-              placeholder="Tell us about your visit..." rows={4}
+            <label htmlFor="review-text" style={{ display: "block", color: "#fff", fontSize: 13, marginBottom: 8 }}>Your review</label>
+            <textarea id="review-text" value={reviewText} maxLength={1000} rows={4}
+              onChange={e => setReviewText(e.target.value)} placeholder="Tell us about your visit..."
               style={{ width: "100%", resize: "vertical", padding: 12, borderRadius: 10, background: "#111", color: "#fff", border: "1px solid rgba(255,255,255,.2)", font: "inherit", boxSizing: "border-box" }} />
-            {ratingError && <p role="alert" style={{ color: "#ff8a80", fontSize: 12 }}>{ratingError}</p>}
+            {ratingError && <p style={{ color: "#ff8a80", fontSize: 12 }}>{ratingError}</p>}
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
               <button className="btn-outline" style={{ fontSize: 13 }} onClick={() => setRatingBooking(null)}>Cancel</button>
               <button className="btn-pink" style={{ fontSize: 13 }} onClick={submitRating} disabled={ratingLoading}>
@@ -257,12 +306,14 @@ export default function MyBookings({ onBack, onBook }: Props) {
           ))}
         </div>
 
+        {/* Error */}
         {fetchError && (
           <div style={{ background: "rgba(244,67,54,0.1)", border: "1px solid rgba(244,67,54,0.3)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <p style={{ color: "#ff6b6b", fontSize: 13, fontWeight: 700, margin: 0 }}>Could not load bookings</p>
             <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, margin: "6px 0 0" }}>{fetchError}</p>
           </div>
         )}
+
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>Loading bookings...</div>
         ) : filtered.length === 0 ? (
@@ -272,122 +323,50 @@ export default function MyBookings({ onBack, onBook }: Props) {
             <button className="btn-pink" onClick={onBook} style={{ marginTop: 20, width: "auto", padding: "12px 32px", borderRadius: 10 }}>Book Now</button>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {filtered.map(b => (
-              <div key={b.id} className="card" style={{
-                padding: 0, overflow: "hidden",
-                border: b.status === "confirmed" ? "1.5px solid #4caf50" : undefined,
-              }}>
-
-                {/* Confirmed banner */}
-                {b.status === "confirmed" && (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    background: "rgba(76,175,80,0.13)",
-                    borderBottom: "1px solid rgba(76,175,80,0.25)",
-                    padding: "11px 20px",
-                  }}>
-                    <span style={{ fontSize: 22 }}>✅</span>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: "#4caf50" }}>
-                        Appointment Confirmed!
-                      </p>
-                      <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                        The salon has approved your booking. Full details below.
-                      </p>
+              <button
+                key={b.id}
+                onClick={() => setViewBooking(b)}
+                style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+              >
+                <div className="card" style={{
+                  padding: 18,
+                  border: b.status === "confirmed" ? "1.5px solid #4caf50" : undefined,
+                  transition: "transform .15s, box-shadow .15s",
+                }}>
+                  {/* Confirmed indicator */}
+                  {b.status === "confirmed" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                      <span style={{ fontSize: 15 }}>✅</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#4caf50" }}>Confirmed by salon</span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div style={{ padding: 20 }}>
-                  {/* Service + status header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                    <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-                      <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{b.services}</p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+                      <p style={{ fontWeight: 800, fontSize: 14, marginBottom: 3 }}>{b.services}</p>
                       <p style={{ fontSize: 12, color: "var(--text-muted)" }}>💇 {b.stylist}</p>
                     </div>
-                    <span className={`badge badge-${b.status}`} style={{ flexShrink: 0, textTransform: "capitalize" }}>
-                      {b.status}
-                    </span>
+                    <span style={{
+                      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      background: `${statusColor[b.status] ?? "#888"}22`,
+                      color: statusColor[b.status] ?? "#888",
+                      textTransform: "capitalize",
+                    }}>{b.status}</span>
                   </div>
 
-                  {/* Full details */}
-                  <div style={{
-                    display: "grid", gridTemplateColumns: "1fr 1fr",
-                    gap: "12px 20px", fontSize: 13,
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: 10, padding: 14, marginBottom: 14,
-                  }}>
-                    <div>
-                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>DATE</p>
-                      <p style={{ fontWeight: 600 }}>📅 {b.date}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>TIME</p>
-                      <p style={{ fontWeight: 600 }}>🕐 {b.time}</p>
-                    </div>
-                    {b.customer_name && (
-                      <div>
-                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>NAME</p>
-                        <p style={{ fontWeight: 600 }}>👤 {b.customer_name}</p>
-                      </div>
-                    )}
-                    {b.customer_phone && (
-                      <div>
-                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>PHONE</p>
-                        <p style={{ fontWeight: 600 }}>📞 {b.customer_phone}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>PAYMENT</p>
-                      <p style={{ fontWeight: 600 }}>💳 {b.payment_method ?? "Cash"}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>TOTAL</p>
-                      <p style={{ fontWeight: 800, color: "var(--pink)", fontSize: 17 }}>₱{Number(b.total).toLocaleString()}</p>
-                    </div>
-                    {b.notes && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>NOTES</p>
-                        <p style={{ color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>📝 {b.notes}</p>
-                      </div>
-                    )}
-                    {b.created_at && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontWeight: 700, letterSpacing: 1, marginBottom: 3 }}>BOOKED ON</p>
-                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.38)" }}>{new Date(b.created_at).toLocaleString()}</p>
-                      </div>
-                    )}
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text-muted)", alignItems: "center" }}>
+                    <span>📅 {b.date}</span>
+                    <span>🕐 {b.time}</span>
+                    <span style={{ marginLeft: "auto", color: "var(--pink)", fontWeight: 800, fontSize: 15 }}>₱{Number(b.total).toLocaleString()}</span>
                   </div>
 
-                  {/* Actions */}
-                  {b.status === "pending" && (
-                    <button className="btn-outline" style={{ padding: "8px 20px", fontSize: 12 }} onClick={() => cancel(b.id)}>
-                      Cancel Booking
-                    </button>
-                  )}
-                  {b.status === "completed" && !b.rated && (
-                    <button className="btn-pink"
-                      style={{ width: "auto", padding: "8px 20px", fontSize: 12, borderRadius: 10 }}
-                      onClick={() => { setServiceStars(0); setStylistStars(0); setReviewText(""); setRatingError(""); setRatingBooking(b); }}>
-                      ★ Rate & Review
-                    </button>
-                  )}
-                  {b.status === "completed" && b.rated && (
-                    <div style={{ fontSize: 13, color: "#ffc107", background: "rgba(255,193,7,0.08)", borderRadius: 8, padding: "10px 14px" }}>
-                      <p style={{ margin: 0, fontWeight: 700 }}>Your Review</p>
-                      <p style={{ margin: "4px 0 0" }}>
-                        {"★".repeat(Math.min(5, Math.max(0, Math.floor(b.service_rating ?? 0))))} {b.service_rating}/5 Service
-                        {" · "}
-                        {"★".repeat(Math.min(5, Math.max(0, Math.floor(b.stylist_rating ?? 0))))} {b.stylist_rating}/5 Stylist
-                      </p>
-                      {b.review_text && (
-                        <p style={{ color: "rgba(255,255,255,0.6)", margin: "6px 0 0", fontStyle: "italic" }}>"{b.review_text}"</p>
-                      )}
-                    </div>
-                  )}
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 10, textAlign: "right" }}>
+                    Tap to view full details →
+                  </p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
