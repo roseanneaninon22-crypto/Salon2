@@ -16,7 +16,7 @@ export default function HomeScreen({ onBook, onMyBookings, onMessages, onAbout, 
 
         <div className="site-nav-links">
           <button className="site-nav-link active">Home</button>
-          <button className="site-nav-link" onClick={() => onBook()}>Services</button>
+          <button className="site-nav-link" onClick={() => document.getElementById("customer-services")?.scrollIntoView({ behavior: "smooth" })}>Services</button>
           <button className="site-nav-link" onClick={onMyBookings}>My Bookings</button>
           <button className="site-nav-link" onClick={onMessages}>Messages</button>
           <button className="site-nav-link" onClick={() => document.getElementById("customer-about")?.scrollIntoView({ behavior: "smooth" })}>About</button>
