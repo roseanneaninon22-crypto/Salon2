@@ -54,7 +54,7 @@ export default function HomeScreen({ onBook, onMyBookings, onMessages, onAbout, 
             Treat yourself to a premium salon experience. Choose from our wide range of services and expert stylists.
           </p>
           <div style={{ display: "flex", gap: 16 }}>
-            <button className="btn-pink" onClick={() => onBook()} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
+            <button className="btn-pink" onClick={() => document.getElementById("customer-services")?.scrollIntoView({ behavior: "smooth" })} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
               📅 Book Now
             </button>
             <button className="btn-outline" onClick={onMyBookings} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 12 }}>
