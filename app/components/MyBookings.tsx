@@ -189,10 +189,10 @@ export default function MyBookings({ onBack, onBook }: Props) {
           <div style={{ background: "#1a1a1a", border: "1px solid rgba(232,25,125,0.3)", borderRadius: 16, padding: 28, width: "min(440px, calc(100vw - 32px))", maxHeight: "90vh", overflowY: "auto" }}>
             <p style={{ fontWeight: 700, fontSize: 18, color: "var(--gold)", marginBottom: 6, textAlign: "center" }}>Rate Your Experience</p>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 20, textAlign: "center" }}>{ratingBooking.services} · {ratingBooking.stylist}</p>
-            {[
+            {([
               { label: "Service experience", value: serviceStars, set: setServiceStars },
               { label: "Stylist performance", value: stylistStars, set: setStylistStars },
-            ].map(g => (
+            ] as { label: string; value: number; set: (n: number) => void }[]).map(g => (
               <fieldset key={g.label} style={{ border: 0, padding: 0, margin: "0 0 16px" }}>
                 <legend style={{ color: "#fff", fontSize: 13, marginBottom: 6 }}>{g.label}</legend>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -357,9 +357,9 @@ export default function MyBookings({ onBack, onBook }: Props) {
                     <div style={{ fontSize: 13, color: "#ffc107", background: "rgba(255,193,7,0.08)", borderRadius: 8, padding: "10px 14px" }}>
                       <p style={{ margin: 0, fontWeight: 700 }}>Your Review</p>
                       <p style={{ margin: "4px 0 0" }}>
-                        Service: {"★".repeat(b.service_rating ?? 0)} {b.service_rating}/5
+                        {"★".repeat(Math.min(5, Math.max(0, Math.floor(b.service_rating ?? 0))))} {b.service_rating}/5 Service
                         {" · "}
-                        Stylist: {"★".repeat(b.stylist_rating ?? 0)} {b.stylist_rating}/5
+                        {"★".repeat(Math.min(5, Math.max(0, Math.floor(b.stylist_rating ?? 0))))} {b.stylist_rating}/5 Stylist
                       </p>
                       {b.review_text && (
                         <p style={{ color: "rgba(255,255,255,0.6)", margin: "6px 0 0", fontStyle: "italic" }}>"{b.review_text}"</p>
