@@ -105,10 +105,18 @@ export default function MyBookings({ onBack, onBook }: Props) {
       if (disposed) return;
       subscribeToBookings(user.id);
 
+      // Get user's phone from profile for fallback matching
+      const { data: profile } = await supabase
+        .from("users")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const userPhone = profile?.phone ?? "";
+
       const { data, error: fetchError } = await supabase
         .from("bookings")
         .select("*")
-        .eq("user_id", user.id)
+        .or(`user_id.eq.${user.id}${userPhone ? `,customer_phone.eq.${userPhone}` : ""}`)
         .order("created_at", { ascending: false });
       if (disposed) return;
 
@@ -129,7 +137,7 @@ export default function MyBookings({ onBack, onBook }: Props) {
         void supabase
           .from("bookings")
           .select("*")
-          .eq("user_id", user.id)
+          .or(`user_id.eq.${user.id}${userPhone ? `,customer_phone.eq.${userPhone}` : ""}`)
           .order("created_at", { ascending: false })
           .then(({ data: fresh }) => {
             if (!disposed && fresh) setBookings(fresh);
