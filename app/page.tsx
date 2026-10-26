@@ -190,6 +190,7 @@ export default function App() {
       {screen === "confirm" && <BookingConfirm serviceIds={selectedServices} stylistId={selectedStylist} stylistName={selectedStylistName} date={selectedDate} time={selectedTime} chosen={chosen} customerName={customerName} customerPhone={customerPhone} customerNotes={customerNotes} onDone={() => setScreen("my-bookings")} onNewBooking={resetBooking} />}
 
       {screen === "messages" && <MessageCenter onBack={() => setScreen("home")} />}
+      {screen === "my-bookings" && <MyBookings onBack={() => setScreen("home")} onBook={handleBook} />}
       {screen === "admin" && <AdminDashboard onLogout={handleLogout} />}
       {screen === "stylist" && <StylistDashboard onLogout={handleLogout} userName={userName} />}
       {screen !== "admin" && screen !== "stylist" && screen !== "landing" && screen !== "home" && screen !== "about" && <SiteFooter />}
