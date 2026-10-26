@@ -71,30 +71,32 @@ export default function AllServicesPage({ onBack, onOpenService }: Props) {
         <button className="btn-ghost" type="button" onClick={onBack}>Back to Home</button>
       </nav>
 
-      <section className="all-services-content">
-        <p className="landing-eyebrow">Rosseygirl Salon</p>
-        <h1>All Services</h1>
-        <p className="all-services-intro">Explore our full menu of salon services and treatments.</p>
+      <section className="landing-services section">
+        <div className="container">
+          <p className="landing-eyebrow">Rosseygirl Salon</p>
+          <h2>All Services</h2>
+          <p style={{ color: "rgba(245,230,208,0.65)", marginBottom: 24, fontSize: 15 }}>Explore our full menu of salon services and treatments.</p>
 
-        <div className="all-services-filters">
-          <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search services" aria-label="Search all services" />
-          <select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter services by category">
-            <option>All categories</option>
-            {categories.map(item => <option key={item}>{item}</option>)}
-          </select>
+          <div className="all-services-filters">
+            <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search services" aria-label="Search all services" />
+            <select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter services by category">
+              <option>All categories</option>
+              {categories.map(item => <option key={item}>{item}</option>)}
+            </select>
+          </div>
+
+          <div className="landing-service-grid">
+            {services.map(service => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                onExplore={() => { if (typeof service.id === "number") onOpenService(service.id); }}
+              />
+            ))}
+          </div>
+
+          {services.length === 0 && <p className="all-services-empty">No services match your search or category filter.</p>}
         </div>
-
-        <div className="all-services-grid">
-          {services.map(service => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              onExplore={() => { if (typeof service.id === "number") onOpenService(service.id); }}
-            />
-          ))}
-        </div>
-
-        {services.length === 0 && <p className="all-services-empty">No services match your search or category filter.</p>}
       </section>
     </main>
   );

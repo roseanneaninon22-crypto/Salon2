@@ -189,19 +189,6 @@ export default function App() {
       {screen === "reservation" && <ReservationForm serviceIds={selectedServices} stylistId={selectedStylist} stylistName={selectedStylistName} date={selectedDate} time={selectedTime} chosen={chosen} onConfirm={handleConfirm} onBack={() => setScreen("choose-stylist")} />}
       {screen === "confirm" && <BookingConfirm serviceIds={selectedServices} stylistId={selectedStylist} stylistName={selectedStylistName} date={selectedDate} time={selectedTime} chosen={chosen} customerName={customerName} customerPhone={customerPhone} customerNotes={customerNotes} onDone={() => setScreen("my-bookings")} onNewBooking={resetBooking} />}
 
-{screen === "service-details" && (
-  <ServiceDetailsPage
-    serviceId={detailServiceId}
-    onBack={() => setScreen(detailReturnScreen)}
-    onLogin={handleLogin}
-   onBook={
-  detailReturnScreen === "home"
-    ? (serviceId) => bookService(serviceId)
-    : undefined
-}
-  />
-)}
-
       {screen === "messages" && <MessageCenter onBack={() => setScreen("home")} />}
       {screen === "admin" && <AdminDashboard onLogout={handleLogout} />}
       {screen === "stylist" && <StylistDashboard onLogout={handleLogout} userName={userName} />}

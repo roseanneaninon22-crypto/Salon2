@@ -892,6 +892,7 @@ body {
 .message-bubble.theirs { align-self: flex-start; background: rgba(255,255,255,.09); border-bottom-left-radius: 3px; }
 .message-bubble p { white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
 .message-bubble time { display: block; margin-top: 6px; color: rgba(255,255,255,.66); font-size: 10px; }
+.message-sender-name { display: block; font-size: 10px; font-weight: 700; color: var(--gold); margin-bottom: 3px; }
 .message-form { display: flex; gap: 10px; align-items: flex-end; padding: 14px; border-top: 1px solid rgba(255,255,255,.1); }
 .message-form textarea { flex: 1; min-height: 48px; max-height: 120px; resize: vertical; padding: 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; outline: none; background: rgba(255,255,255,.06); color: #fff; font: inherit; font-size: 13px; }
 .message-form textarea:focus { border-color: var(--pink); }
